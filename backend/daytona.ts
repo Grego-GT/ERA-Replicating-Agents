@@ -11,12 +11,70 @@
 import "jsr:@std/dotenv/load"; // needed for deno run; not req for smallweb or valtown
 import { Daytona } from 'npm:@daytonaio/sdk';
 
+// ============================================================================
+// Type Definitions
+// ============================================================================
+
+/**
+ * Daytona sandbox instance with process execution capabilities
+ */
+interface DaytonaSandbox {
+  id: string;
+  process: {
+    codeRun: (code: string) => Promise<CodeRunResponse>;
+  };
+  remove?: () => Promise<void>;
+  delete?: () => Promise<void>;
+  destroy?: () => Promise<void>;
+  [key: string]: unknown;
+}
+
+/**
+ * Response from code execution
+ */
+export interface CodeRunResponse {
+  result: string;
+  [key: string]: unknown;
+}
+
+/**
+ * Options for creating a Daytona sandbox
+ */
+interface CreateSandboxOptions {
+  language?: string;
+}
+
+/**
+ * Math operation result
+ */
+interface MathResult {
+  success: boolean;
+  operation: string;
+  answer: number;
+  timestamp: string;
+  raw: string;
+}
+
+/**
+ * Math operation test case
+ */
+interface MathOperation {
+  a: number;
+  b: number;
+  op: string;
+  desc: string;
+}
+
+// ============================================================================
+// Core Functions
+// ============================================================================
+
 /**
  * Initialize Daytona client with credentials from environment
  * 
- * @returns {Daytona} Configured Daytona instance
+ * @returns Configured Daytona instance
  */
-export function initDaytona() {
+export function initDaytona(): Daytona {
   const apiKey = Deno.env.get('DAYTONA_API_KEY');
   const apiUrl = Deno.env.get('DAYTONA_API_URL');
   
@@ -35,16 +93,16 @@ export function initDaytona() {
 /**
  * Run code in a Daytona sandbox and get the console output
  * 
- * @param {string} code - The JavaScript/TypeScript code to run
- * @param {string} language - The language (default: 'typescript')
- * @returns {Promise<object>} The execution result with stdout/stderr
+ * @param code - The JavaScript/TypeScript code to run
+ * @param language - The language (default: 'typescript')
+ * @returns The execution result with stdout/stderr
  */
-export async function runCode(code, language = 'typescript') {
+export async function runCode(code: string, language: string = 'typescript'): Promise<CodeRunResponse> {
   try {
     const daytona = initDaytona();
     
     // Create a sandbox
-    const sandbox = await daytona.create({ language });
+    const sandbox = await daytona.create({ language }) as unknown as DaytonaSandbox;
     console.log(`✅ Sandbox created: ${sandbox.id}`);
     
     // Run the code
@@ -61,13 +119,15 @@ export async function runCode(code, language = 'typescript') {
       }
       console.log('✅ Sandbox cleaned up');
     } catch (cleanupError) {
-      console.warn('⚠️ Sandbox cleanup skipped:', cleanupError.message);
+      const err = cleanupError as Error;
+      console.warn('⚠️ Sandbox cleanup skipped:', err.message);
     }
     
     return response;
     
   } catch (error) {
-    console.error('❌ Code execution failed:', error);
+    const err = error as Error;
+    console.error('❌ Code execution failed:', err);
     throw error;
   }
 }
@@ -75,17 +135,17 @@ export async function runCode(code, language = 'typescript') {
 /**
  * Run a math operation in Daytona sandbox
  * 
- * @param {number} a - First number
- * @param {number} b - Second number
- * @param {string} operator - Math operator (+, -, *, /, **, %)
- * @returns {Promise<object>} Result with answer and details
+ * @param a - First number
+ * @param b - Second number
+ * @param operator - Math operator (+, -, *, /, **, %)
+ * @returns Result with answer and details
  */
-export async function runMath(a, b, operator = '+') {
+export async function runMath(a: number, b: number, operator: string = '+'): Promise<MathResult> {
   try {
     const daytona = initDaytona();
     
     // Create a TypeScript sandbox
-    const sandbox = await daytona.create({ language: 'typescript' });
+    const sandbox = await daytona.create({ language: 'typescript' }) as unknown as DaytonaSandbox;
     console.log(`✅ Sandbox created: ${sandbox.id}`);
     
     // Build the math code
@@ -124,12 +184,13 @@ export async function runMath(a, b, operator = '+') {
       }
       console.log('✅ Sandbox cleaned up');
     } catch (cleanupError) {
-      console.warn('⚠️ Sandbox cleanup skipped:', cleanupError.message);
+      const err = cleanupError as Error;
+      console.warn('⚠️ Sandbox cleanup skipped:', err.message);
     }
     
     // Parse the result
     const resultText = response.result;
-    const parsed = JSON.parse(resultText);
+    const parsed = JSON.parse(resultText) as { operation: string; answer: number; timestamp: string };
     
     return {
       success: true,
@@ -138,7 +199,8 @@ export async function runMath(a, b, operator = '+') {
     };
     
   } catch (error) {
-    console.error('❌ Math calculation failed:', error);
+    const err = error as Error;
+    console.error('❌ Math calculation failed:', err);
     throw error;
   }
 }
@@ -146,14 +208,14 @@ export async function runMath(a, b, operator = '+') {
 /**
  * Run a basic Daytona test with math operations
  * 
- * @returns {Promise<void>}
+ * @returns Promise that resolves when tests complete
  */
-export async function runDaytonaTest() {
+export async function runDaytonaTest(): Promise<void> {
   console.log('🚀 Starting Daytona Math Test...\n');
   
   try {
     // Test different operations
-    const operations = [
+    const operations: MathOperation[] = [
       { a: 10, b: 5, op: '+', desc: 'Addition' },
       { a: 20, b: 7, op: '-', desc: 'Subtraction' },
       { a: 6, b: 8, op: '*', desc: 'Multiplication' },
@@ -173,7 +235,8 @@ export async function runDaytonaTest() {
     console.log('✅ All math tests completed successfully!\n');
     
   } catch (error) {
-    console.error('❌ Daytona test failed:', error);
+    const err = error as Error;
+    console.error('❌ Daytona test failed:', err);
     throw error;
   }
 }

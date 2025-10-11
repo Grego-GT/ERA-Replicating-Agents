@@ -5,11 +5,12 @@
  * This script verifies that Weave tracing is properly integrated
  * with all Wandb chat functions.
  * 
- * Run: deno run --allow-net --allow-env test-weave-integration.js
+ * Run: deno run --allow-net --allow-env test-weave-integration.ts
  */
 
-import * as weave from "./weave.js";
-import { chat, simpleChat, chatWithHistory } from "./wandb.js";
+import * as weave from "./weave.ts";
+import { chat, simpleChat, chatWithHistory } from "./wandb.ts";
+import type { ChatMessage } from "./wandb.ts";
 
 console.log('🧪 Testing Weave Integration with Wandb Inference\n');
 
@@ -19,7 +20,8 @@ try {
   await weave.init();
   console.log('✅ Weave initialized successfully\n');
 } catch (error) {
-  console.error('❌ Weave initialization failed:', error);
+  const err = error as Error;
+  console.error('❌ Weave initialization failed:', err);
   Deno.exit(1);
 }
 
@@ -30,7 +32,8 @@ try {
   console.log('Response:', response.substring(0, 50) + '...');
   console.log('✅ Simple chat traced successfully\n');
 } catch (error) {
-  console.error('❌ Simple chat failed:', error);
+  const err = error as Error;
+  console.error('❌ Simple chat failed:', err);
   Deno.exit(1);
 }
 
@@ -47,14 +50,15 @@ try {
   console.log('Response:', response.choices[0].message.content.substring(0, 50));
   console.log('✅ Chat with options traced successfully\n');
 } catch (error) {
-  console.error('❌ Chat with options failed:', error);
+  const err = error as Error;
+  console.error('❌ Chat with options failed:', err);
   Deno.exit(1);
 }
 
 // Test 4: Conversation History (traced)
 console.log('Test 4: Conversation History with Tracing');
 try {
-  let history = [];
+  let history: ChatMessage[] = [];
   
   const turn1 = await chatWithHistory(history, 'Remember this number: 42');
   history = turn1.updatedHistory;
@@ -64,14 +68,15 @@ try {
   console.log('Turn 2 response:', turn2.assistantMessage.content.substring(0, 50));
   console.log('✅ Conversation history traced successfully\n');
 } catch (error) {
-  console.error('❌ Conversation history failed:', error);
+  const err = error as Error;
+  console.error('❌ Conversation history failed:', err);
   Deno.exit(1);
 }
 
 // Test 5: Custom Traced Function
 console.log('Test 5: Custom Function with Weave Tracing');
 try {
-  async function customFunction(input) {
+  async function customFunction(input: string): Promise<{ original: string; echo: string }> {
     const response = await simpleChat(`Echo this: ${input}`);
     return { original: input, echo: response };
   }
@@ -81,19 +86,21 @@ try {
   console.log('Original:', result.original);
   console.log('✅ Custom traced function works\n');
 } catch (error) {
-  console.error('❌ Custom traced function failed:', error);
+  const err = error as Error;
+  console.error('❌ Custom traced function failed:', err);
   Deno.exit(1);
 }
 
-// Test 6: Example Traced Function from weave.js
+// Test 6: Example Traced Function from weave.ts
 console.log('Test 6: Example Traced Function');
 try {
-  const { exampleTracedFunction } = await import('./weave.js');
+  const { exampleTracedFunction } = await import('./weave.ts');
   const result = await exampleTracedFunction('integration-test');
   console.log('Success:', result.success);
   console.log('✅ Example traced function works\n');
 } catch (error) {
-  console.error('❌ Example traced function failed:', error);
+  const err = error as Error;
+  console.error('❌ Example traced function failed:', err);
   Deno.exit(1);
 }
 

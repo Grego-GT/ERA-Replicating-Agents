@@ -13,17 +13,92 @@
 
 import "jsr:@std/dotenv/load"; // needed for deno run; not req for smallweb or valtown
 import { Sema } from "npm:async-sema";
-import * as weave from "./weave.js";
+import * as weave from "./weave.ts";
 
 // Semaphore: Allow 10 concurrent requests at a time to avoid 503 errors
 const sema = new Sema(10);
 
+// ============================================================================
+// Type Definitions
+// ============================================================================
+
+/**
+ * Message in a conversation
+ */
+export interface ChatMessage {
+  role: 'system' | 'user' | 'assistant';
+  content: string;
+}
+
+/**
+ * Options for chat function
+ */
+export interface ChatOptions {
+  model?: string;
+  messages?: ChatMessage[];
+  systemPrompt?: string | null;
+  temperature?: number | null;
+  maxTokens?: number | null;
+  topP?: number | null;
+}
+
+/**
+ * Wandb configuration
+ */
+interface WandbConfig {
+  apiKey: string;
+  project?: string;
+}
+
+/**
+ * Chat completion choice
+ */
+interface ChatCompletionChoice {
+  message: ChatMessage;
+  finish_reason?: string;
+  index?: number;
+}
+
+/**
+ * Usage statistics
+ */
+interface ChatUsage {
+  prompt_tokens?: number;
+  completion_tokens?: number;
+  total_tokens?: number;
+}
+
+/**
+ * Chat completion response
+ */
+export interface ChatCompletionResponse {
+  id?: string;
+  object?: string;
+  created?: number;
+  model?: string;
+  choices: ChatCompletionChoice[];
+  usage?: ChatUsage;
+}
+
+/**
+ * Chat with history response
+ */
+export interface ChatWithHistoryResponse {
+  response: ChatCompletionResponse;
+  assistantMessage: ChatMessage;
+  updatedHistory: ChatMessage[];
+}
+
+// ============================================================================
+// Core Functions
+// ============================================================================
+
 /**
  * Get Wandb API configuration from environment
  * 
- * @returns {object} Config object with apiKey and project
+ * @returns Config object with apiKey and project
  */
-function getWandbConfig() {
+function getWandbConfig(): WandbConfig {
   const apiKey = Deno.env.get('WANDB_API_KEY');
   const project = Deno.env.get('WANDB_PROJECT');
   
@@ -37,14 +112,8 @@ function getWandbConfig() {
 /**
  * Chat with an LLM using Wandb Inference API (internal implementation)
  * 
- * @param {object} options - Chat options
- * @param {string} options.model - Model name (default: "Qwen/Qwen3-Coder-480B-A35B-Instruct")
- * @param {Array} options.messages - Array of message objects with role and content
- * @param {string} options.systemPrompt - Optional system prompt (alternative to including in messages)
- * @param {number} options.temperature - Temperature for sampling (optional)
- * @param {number} options.maxTokens - Max tokens to generate (optional)
- * @param {number} options.topP - Top p sampling (optional)
- * @returns {Promise<object>} The completion response
+ * @param options - Chat options
+ * @returns The completion response
  */
 async function chatImpl({
   model = "Qwen/Qwen3-Coder-480B-A35B-Instruct",
@@ -53,7 +122,7 @@ async function chatImpl({
   temperature = null,
   maxTokens = null,
   topP = null
-}) {
+}: ChatOptions): Promise<ChatCompletionResponse> {
   // Acquire semaphore token
   await sema.acquire();
   
@@ -61,7 +130,7 @@ async function chatImpl({
     const { apiKey, project } = getWandbConfig();
     
     // Build messages array
-    let fullMessages = [...messages];
+    let fullMessages: ChatMessage[] = [...messages];
     if (systemPrompt && !fullMessages.some(m => m.role === 'system')) {
       fullMessages = [
         { role: 'system', content: systemPrompt },
@@ -70,7 +139,7 @@ async function chatImpl({
     }
     
     // Build request body
-    const body = {
+    const body: Record<string, unknown> = {
       model,
       messages: fullMessages
     };
@@ -81,7 +150,7 @@ async function chatImpl({
     if (topP !== null) body.top_p = topP;
     
     // Build headers
-    const headers = {
+    const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${apiKey}`
     };
@@ -103,14 +172,15 @@ async function chatImpl({
       throw new Error(`Wandb API error (${response.status}): ${errorText}`);
     }
     
-    const data = await response.json();
+    const data = await response.json() as ChatCompletionResponse;
     
     console.log(`✅ Chat completion received (model: ${model})`);
     
     return data;
     
   } catch (error) {
-    console.error('❌ Chat completion failed:', error);
+    const err = error as Error;
+    console.error('❌ Chat completion failed:', err);
     throw error;
   } finally {
     // Always release the semaphore token
@@ -122,23 +192,20 @@ async function chatImpl({
  * Chat with an LLM using Wandb Inference API
  * Traced with Weave for observability
  * 
- * @param {object} options - Chat options (see chatImpl for details)
- * @returns {Promise<object>} The completion response
+ * @param options - Chat options (see chatImpl for details)
+ * @returns The completion response
  */
 export const chat = weave.op(chatImpl);
 
 /**
  * Simplified chat function that returns just the message content (internal implementation)
  * 
- * @param {string} userMessage - The user's message
- * @param {object} options - Optional parameters
- * @param {string} options.model - Model name
- * @param {string} options.systemPrompt - System prompt
- * @param {number} options.temperature - Temperature
- * @returns {Promise<string>} The assistant's response content
+ * @param userMessage - The user's message
+ * @param options - Optional parameters
+ * @returns The assistant's response content
  */
-async function simpleChatImpl(userMessage, options = {}) {
-  const messages = [
+async function simpleChatImpl(userMessage: string, options: ChatOptions = {}): Promise<string> {
+  const messages: ChatMessage[] = [
     { role: 'user', content: userMessage }
   ];
   
@@ -159,13 +226,17 @@ export const simpleChat = weave.op(simpleChatImpl);
 /**
  * Chat with conversation history (internal implementation)
  * 
- * @param {Array} conversationHistory - Array of previous messages
- * @param {string} newMessage - New user message to add
- * @param {object} options - Optional parameters
- * @returns {Promise<object>} Response with updated conversation and assistant message
+ * @param conversationHistory - Array of previous messages
+ * @param newMessage - New user message to add
+ * @param options - Optional parameters
+ * @returns Response with updated conversation and assistant message
  */
-async function chatWithHistoryImpl(conversationHistory = [], newMessage, options = {}) {
-  const messages = [
+async function chatWithHistoryImpl(
+  conversationHistory: ChatMessage[] = [], 
+  newMessage: string, 
+  options: ChatOptions = {}
+): Promise<ChatWithHistoryResponse> {
+  const messages: ChatMessage[] = [
     ...conversationHistory,
     { role: 'user', content: newMessage }
   ];
@@ -196,22 +267,22 @@ export const chatWithHistory = weave.op(chatWithHistoryImpl);
 /**
  * Stream chat completions (if supported by the API) (internal implementation)
  * 
- * @param {object} options - Same as chat() options plus stream: true
- * @returns {Promise<ReadableStream>} Stream of completion chunks
+ * @param options - Same as chat() options plus stream: true
+ * @returns Stream of completion chunks
  */
-async function streamChatImpl(options) {
+async function streamChatImpl(options: ChatOptions): Promise<ReadableStream<Uint8Array> | null> {
   // Acquire semaphore token
   await sema.acquire();
   
   try {
     const { apiKey, project } = getWandbConfig();
     
-    const body = {
+    const body: Record<string, unknown> = {
       ...options,
       stream: true
     };
     
-    const headers = {
+    const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${apiKey}`
     };
@@ -238,7 +309,8 @@ async function streamChatImpl(options) {
     return response.body;
     
   } catch (error) {
-    console.error('❌ Stream chat failed:', error);
+    const err = error as Error;
+    console.error('❌ Stream chat failed:', err);
     sema.release(); // Release on error
     throw error;
   }
@@ -253,9 +325,9 @@ export const streamChat = weave.op(streamChatImpl);
 /**
  * Run a test chat to verify the integration works
  * 
- * @returns {Promise<void>}
+ * @returns Promise that resolves when tests complete
  */
-export async function runWandbTest() {
+export async function runWandbTest(): Promise<void> {
   console.log('🚀 Starting Wandb Inference Test with Weave Tracing...\n');
   
   try {
@@ -284,7 +356,7 @@ export async function runWandbTest() {
     
     // Test 3: Conversation with history
     console.log('📝 Test 3: Conversation with history');
-    let history = [];
+    let history: ChatMessage[] = [];
     
     const turn1 = await chatWithHistory(history, 'My name is Alice.');
     console.log('👤 User: My name is Alice.');
@@ -300,7 +372,8 @@ export async function runWandbTest() {
     console.log('🔍 Check your Weave dashboard for traces: https://wandb.ai/\n');
     
   } catch (error) {
-    console.error('❌ Wandb test failed:', error);
+    const err = error as Error;
+    console.error('❌ Wandb test failed:', err);
     throw error;
   }
 }

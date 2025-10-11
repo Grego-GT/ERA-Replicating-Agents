@@ -10,9 +10,9 @@
  * 
  * Example:
  * ```
- * import * as weave from './backend/weave.js';
+ * import * as weave from './backend/weave.ts';
  * 
- * async function myFunction(input) {
+ * async function myFunction(input: string) {
  *   // your code here
  *   return result;
  * }
@@ -36,10 +36,10 @@ const DEFAULT_PROJECT = 'agfactory';
  * Call this at application startup with your project details
  * Automatically prevents multiple initializations
  * 
- * @param {string} projectName - Your Wandb project name (default: "agfactory")
- * @returns {Promise<void>}
+ * @param projectName - Your Wandb project name (default: "agfactory")
+ * @returns Promise that resolves when initialization is complete
  */
-export async function init(projectName = DEFAULT_PROJECT) {
+export async function init(projectName: string = DEFAULT_PROJECT): Promise<void> {
   if (isInitialized) {
     console.log(`⚠️ Weave already initialized for project: ${projectName}`);
     return;
@@ -50,7 +50,8 @@ export async function init(projectName = DEFAULT_PROJECT) {
     isInitialized = true;
     console.log(`✅ Weave initialized for project: ${projectName}`);
   } catch (error) {
-    console.error('❌ Failed to initialize Weave:', error);
+    const err = error as Error;
+    console.error('❌ Failed to initialize Weave:', err);
     throw error;
   }
 }
@@ -60,9 +61,9 @@ export async function init(projectName = DEFAULT_PROJECT) {
  * Call this at the start of any function that needs Weave
  * Safe to call multiple times - only initializes once
  * 
- * @returns {Promise<void>}
+ * @returns Promise that resolves when initialization is complete
  */
-export async function ensureInitialized() {
+export async function ensureInitialized(): Promise<void> {
   if (!isInitialized) {
     await init(DEFAULT_PROJECT);
   }
@@ -72,12 +73,12 @@ export async function ensureInitialized() {
  * Weave op wrapper for tracing functions
  * Wrap any function with this to enable Weave tracing
  * 
- * @param {Function} fn - The function to trace
- * @returns {Function} Traced version of the function
+ * @param fn - The function to trace
+ * @returns Traced version of the function
  * 
  * Example:
  * ```
- * async function extractData(input) {
+ * async function extractData(input: string) {
  *   // your code here
  *   return result;
  * }
@@ -98,7 +99,12 @@ export { weaveLib as weave };
  * Example traced function
  * This demonstrates how to use the op wrapper
  */
-async function exampleOperation(input) {
+async function exampleOperation(input: string): Promise<{
+  success: boolean;
+  input: string;
+  output: string;
+  timestamp: number;
+}> {
   console.log('Running traced operation with input:', input);
   
   // Simulate some work
@@ -117,13 +123,13 @@ export const exampleTracedFunction = op(exampleOperation);
  * Utility to create a traced AI call
  * Wraps AI model calls with automatic Weave tracing
  * 
- * @param {Function} aiFunction - The AI function to trace
- * @param {string} operationName - Optional name for the operation (defaults to function name)
- * @returns {Function} Traced version of the function
+ * @param aiFunction - The AI function to trace
+ * @param operationName - Optional name for the operation (defaults to function name)
+ * @returns Traced version of the function
  * 
  * Example:
  * ```
- * async function generateText(prompt) {
+ * async function generateText(prompt: string) {
  *   const response = await openai.chat.completions.create({
  *     model: 'gpt-4',
  *     messages: [{ role: 'user', content: prompt }]
@@ -136,7 +142,10 @@ export const exampleTracedFunction = op(exampleOperation);
  * await generateTextOp('Tell me a story');
  * ```
  */
-export function createTracedAICall(aiFunction, operationName) {
+export function createTracedAICall<T extends (...args: any[]) => any>(
+  aiFunction: T, 
+  operationName?: string
+): T {
   console.log(`🔍 Creating traced AI operation: ${operationName || aiFunction.name}`);
   return op(aiFunction);
 }

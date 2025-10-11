@@ -5,15 +5,27 @@
   "exports": {
     ".": "./core/main.js",
     "./cli": "./cli.ts",
-    "./daytona": "./core/backend/daytona.js",
-    "./weave": "./core/backend/weave.js",
-    "./wandb": "./core/backend/wandb.js",
+    "./daytona": "./core/backend/daytona.ts",
+    "./weave": "./core/backend/weave.ts",
+    "./wandb": "./core/backend/wandb.ts",
+    "./codegen": "./core/backend/codegen.ts",
     "./@daytonaio/sdk": "npm:@daytonaio/sdk"
   },
   "tasks": {
     "cli": "deno run --allow-read --allow-write --allow-env --allow-net --allow-sys cli.ts",
     "cli:create": "deno run --allow-read --allow-write --allow-env --allow-net --allow-sys cli.ts create",
-    "codegen": "deno run --allow-net --allow-read --allow-env --allow-sys backend/codegen.js",
+    "dev": "deno run --allow-net --allow-read --allow-env --allow-sys --watch main.js",
+    "serve": "deno serve --port 9995 --watch --allow-read --allow-env --allow-write --allow-net --allow-sys --allow-import ./main.js",
+    "git": "git add . && git commit -m 'bump' && git push origin main",
+    "prod": "deployctl deploy --prod --project=agfactory",
+    "daytona": "deno run --allow-net --allow-read --allow-env --allow-sys backend/daytona.ts",
+    "codegen": "deno run --allow-net --allow-read --allow-env --allow-sys backend/codegen.ts",
+    "wandb": "deno run --allow-net --allow-read --allow-env --allow-sys backend/wandb.ts",
+    "test:wandb": "deno run --allow-net --allow-env --allow-sys backend/wandb.ts",
+    "test:daytona": "deno run --allow-net --allow-env --allow-sys backend/daytona.ts",
+    "test:codegen": "deno run --allow-net --allow-env --allow-sys backend/codegen.ts",
+    "test:weave": "deno run --allow-net --allow-env --allow-sys backend/test-weave-integration.ts",
+    "example:wandb-weave": "deno run --allow-net --allow-env --allow-sys backend/wandb-weave-example.ts"
   },
   "$schema": "https://raw.githubusercontent.com/denoland/deno/348900b8b79f4a434cab4c74b3bc8d4d2fa8ee74/cli/schemas/config-file.v1.json",
   "lock": false,
@@ -22,7 +34,9 @@
     "strict": true,
     "lib": [
       "deno.ns",
-      "deno.unstable"
+      "deno.unstable",
+      "esnext",
+      "dom"
     ]
   },
   "lint": {

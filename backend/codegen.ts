@@ -6,17 +6,119 @@
  */
 
 import "jsr:@std/dotenv/load"; // needed for deno run; not req for smallweb or valtown
-import { runCode } from './daytona.js';
-import { chat } from './wandb.js';
-import * as weave from './weave.js';
+import { runCode } from './daytona.ts';
+import { chat } from './wandb.ts';
+import * as weave from './weave.ts';
+
+// ============================================================================
+// Type Definitions
+// ============================================================================
+
+/**
+ * Options for generating code
+ */
+interface GenerateCodeOptions {
+  maxRetries?: number;
+  model?: string;
+}
+
+/**
+ * Result from code generation
+ */
+interface GeneratedCodeResult {
+  success: boolean;
+  code: string;
+  rawResponse: string;
+  attempts: number;
+  model: string;
+}
+
+/**
+ * Parsed JSON output from code execution
+ */
+interface ParsedExecutionOutput {
+  success: boolean;
+  result?: unknown;
+  error?: string;
+  timestamp?: string;
+  [key: string]: unknown;
+}
+
+/**
+ * Execution result details
+ */
+interface ExecutionResult {
+  result: string;
+  parsedOutput: ParsedExecutionOutput | null;
+  raw: unknown;
+  hasError: boolean;
+  errorType: 'compilation' | 'runtime' | null;
+}
+
+/**
+ * Log entry structure
+ */
+interface LogEntry {
+  timestamp: string;
+  message: string;
+  [key: string]: unknown;
+}
+
+/**
+ * Options for generateAndExecute function
+ */
+interface GenerateAndExecuteOptions {
+  maxRetries?: number;
+  language?: string;
+  logCallback?: ((log: LogEntry) => void) | null;
+  model?: string;
+}
+
+/**
+ * Complete result from code generation and execution
+ */
+interface GenerateAndExecuteResult {
+  success: boolean;
+  prompt: string;
+  generated: {
+    code: string;
+    rawResponse: string;
+    attempts: number;
+    model: string;
+  };
+  execution: ExecutionResult;
+  logs: LogEntry[];
+}
+
+/**
+ * Test definition
+ */
+interface TestCase {
+  name: string;
+  prompt: string;
+}
+
+/**
+ * Test result
+ */
+interface TestResult {
+  test: string;
+  success: boolean;
+  result?: GenerateAndExecuteResult;
+  error?: string;
+}
+
+// ============================================================================
+// Core Functions
+// ============================================================================
 
 /**
  * Extract code from LLM response between <code></code> tags
  * 
- * @param {string} response - LLM response text
- * @returns {string|null} Extracted code or null
+ * @param response - LLM response text
+ * @returns Extracted code or null
  */
-function extractCode(response) {
+function extractCode(response: string): string | null {
   // Try to find code between <code></code> tags
   const codeMatch = response.match(/<code>([\s\S]*?)<\/code>/);
   if (codeMatch) {
@@ -35,12 +137,16 @@ function extractCode(response) {
 /**
  * Generate code using Wandb Inference API
  * 
- * @param {string} userPrompt - What the user wants the code to do
- * @param {number} maxRetries - Maximum number of extraction retry attempts
- * @param {string} model - Model to use (default: Qwen3-Coder)
- * @returns {Promise<object>} Generated code and metadata
+ * @param userPrompt - What the user wants the code to do
+ * @param maxRetries - Maximum number of extraction retry attempts
+ * @param model - Model to use (default: Qwen3-Coder)
+ * @returns Generated code and metadata
  */
-export async function generateCode(userPrompt, maxRetries = 3, model = "Qwen/Qwen3-Coder-480B-A35B-Instruct") {
+export async function generateCode(
+  userPrompt: string, 
+  maxRetries: number = 3, 
+  model: string = "Qwen/Qwen3-Coder-480B-A35B-Instruct"
+): Promise<GeneratedCodeResult> {
   const systemPrompt = `You are a code generation assistant. Generate TypeScript/JavaScript code based on user requests.
 
 CRITICAL: Your code will be executed in a TypeScript sandbox. It MUST be valid TypeScript and produce reliable output.
@@ -127,7 +233,7 @@ REMEMBER:
 
 Generate clean, TypeScript-compliant code that will execute without errors.`;
 
-  let lastResponse = null;
+  let lastResponse: string | null = null;
   let attempts = 0;
   let currentPrompt = userPrompt;
   
@@ -175,7 +281,8 @@ Generate clean, TypeScript-compliant code that will execute without errors.`;
       }
       
     } catch (error) {
-      console.error(`❌ Error generating code (attempt ${attempts}):`, error.message);
+      const err = error as Error;
+      console.error(`❌ Error generating code (attempt ${attempts}):`, err.message);
       if (attempts >= maxRetries) {
         throw error;
       }
@@ -189,11 +296,14 @@ Generate clean, TypeScript-compliant code that will execute without errors.`;
 /**
  * Generate and execute code from a user prompt (internal implementation)
  * 
- * @param {string} userPrompt - What the user wants the code to do
- * @param {object} options - Options for generation and execution
- * @returns {Promise<object>} Complete result with code, execution, and logs
+ * @param userPrompt - What the user wants the code to do
+ * @param options - Options for generation and execution
+ * @returns Complete result with code, execution, and logs
  */
-async function generateAndExecuteImpl(userPrompt, options = {}) {
+async function generateAndExecuteImpl(
+  userPrompt: string, 
+  options: GenerateAndExecuteOptions = {}
+): Promise<GenerateAndExecuteResult> {
   const {
     maxRetries = 3,
     language = 'typescript',
@@ -201,8 +311,8 @@ async function generateAndExecuteImpl(userPrompt, options = {}) {
     model = "Qwen/Qwen3-Coder-480B-A35B-Instruct"
   } = options;
   
-  const log = (message, data = {}) => {
-    const logEntry = {
+  const log = (message: string, data: Record<string, unknown> = {}): LogEntry => {
+    const logEntry: LogEntry = {
       timestamp: new Date().toISOString(),
       message,
       ...data
@@ -214,7 +324,7 @@ async function generateAndExecuteImpl(userPrompt, options = {}) {
     return logEntry;
   };
   
-  const logs = [];
+  const logs: LogEntry[] = [];
   
   try {
     logs.push(log('🚀 Starting code generation and execution'));
@@ -241,11 +351,11 @@ async function generateAndExecuteImpl(userPrompt, options = {}) {
     );
     
     // Try to parse JSON output to check for success flag
-    let parsedOutput = null;
+    let parsedOutput: ParsedExecutionOutput | null = null;
     let hasRuntimeError = false;
     try {
       if (execution.result && execution.result.trim().startsWith('{')) {
-        parsedOutput = JSON.parse(execution.result);
+        parsedOutput = JSON.parse(execution.result) as ParsedExecutionOutput;
         hasRuntimeError = parsedOutput.success === false;
       }
     } catch (e) {
@@ -269,7 +379,7 @@ async function generateAndExecuteImpl(userPrompt, options = {}) {
     }
     
     // Step 3: Parse and return results
-    const result = {
+    const result: GenerateAndExecuteResult = {
       success: !hasError,
       prompt: userPrompt,
       generated: {
@@ -293,9 +403,10 @@ async function generateAndExecuteImpl(userPrompt, options = {}) {
     return result;
     
   } catch (error) {
+    const err = error as Error;
     logs.push(log('❌ Error', { 
-      error: error.message,
-      stack: error.stack 
+      error: err.message,
+      stack: err.stack 
     }));
     throw error;
   }
@@ -310,7 +421,7 @@ export const generateAndExecute = weave.op(generateAndExecuteImpl);
 /**
  * Run tests for code generation and execution
  */
-export async function testCodeGen() {
+export async function testCodeGen(): Promise<TestResult[]> {
   console.log('🚀 Starting Code Generation Tests with Wandb + Daytona...\n');
   
   // Initialize Weave for tracing
@@ -318,7 +429,7 @@ export async function testCodeGen() {
   await weave.init();
   console.log('');
   
-  const tests = [
+  const tests: TestCase[] = [
     {
       name: 'Simple Math',
       prompt: 'Create a function that calculates the factorial of 5 and returns the result'
@@ -337,7 +448,7 @@ export async function testCodeGen() {
     }
   ];
   
-  const results = [];
+  const results: TestResult[] = [];
   
   for (const test of tests) {
     console.log(`\n${'='.repeat(60)}`);
@@ -368,11 +479,12 @@ export async function testCodeGen() {
       });
       
     } catch (error) {
-      console.error(`❌ Test "${test.name}" failed:`, error.message);
+      const err = error as Error;
+      console.error(`❌ Test "${test.name}" failed:`, err.message);
       results.push({
         test: test.name,
         success: false,
-        error: error.message
+        error: err.message
       });
     }
   }
@@ -400,4 +512,5 @@ export async function testCodeGen() {
 if (import.meta.main) {
   testCodeGen();
 }
+
 

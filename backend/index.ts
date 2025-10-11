@@ -9,10 +9,10 @@
 import { 
   weave, 
   op, 
-  initWeave, 
+  init as initWeave,
   exampleTracedFunction,
   createTracedAICall 
-} from './weave.js';
+} from './weave.ts';
 
 // Daytona integration for code sandboxing
 import {
@@ -20,14 +20,22 @@ import {
   runCode,
   runMath,
   runDaytonaTest
-} from './daytona.js';
+} from './daytona.ts';
 
 // Code generation and execution
 import {
   generateCode,
   generateAndExecute,
   testCodeGen
-} from './codegen.js';
+} from './codegen.ts';
+
+// Wandb inference
+import {
+  chat,
+  simpleChat,
+  chatWithHistory,
+  runWandbTest
+} from './wandb.ts';
 
 // Export all backend modules
 export {
@@ -45,7 +53,12 @@ export {
   // Code generation
   generateCode,
   generateAndExecute,
-  testCodeGen
+  testCodeGen,
+  // Wandb inference
+  chat,
+  simpleChat,
+  chatWithHistory,
+  runWandbTest
 };
 
 // Legacy backend object for backward compatibility
@@ -66,6 +79,12 @@ export const backend = {
     generate: generateCode,
     execute: generateAndExecute,
     test: testCodeGen
+  },
+  wandb: {
+    chat,
+    simpleChat,
+    chatWithHistory,
+    test: runWandbTest
   },
   placeholder: () => {
     console.log('Backend module placeholder');

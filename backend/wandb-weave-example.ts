@@ -8,16 +8,17 @@
  * - Set WANDB_API_KEY in your .env file
  * - Optionally set WANDB_PROJECT (format: "team/project")
  * 
- * Run with: deno run --allow-net --allow-env wandb-weave-example.js
+ * Run with: deno run --allow-net --allow-env wandb-weave-example.ts
  */
 
-import * as weave from "./weave.js";
-import { chat, simpleChat, chatWithHistory } from "./wandb.js";
+import * as weave from "./weave.ts";
+import { chat, simpleChat, chatWithHistory } from "./wandb.ts";
+import type { ChatMessage } from "./wandb.ts";
 
 /**
  * Example 1: Simple chat with Weave tracing
  */
-async function example1() {
+async function example1(): Promise<void> {
   console.log('\n=== Example 1: Simple Chat ===\n');
   
   const response = await simpleChat('Tell me a fun fact about AI.');
@@ -27,7 +28,7 @@ async function example1() {
 /**
  * Example 2: Chat with custom parameters
  */
-async function example2() {
+async function example2(): Promise<void> {
   console.log('\n=== Example 2: Chat with System Prompt ===\n');
   
   const response = await chat({
@@ -45,10 +46,10 @@ async function example2() {
 /**
  * Example 3: Multi-turn conversation with history
  */
-async function example3() {
+async function example3(): Promise<void> {
   console.log('\n=== Example 3: Conversation with History ===\n');
   
-  let history = [];
+  let history: ChatMessage[] = [];
   
   // Turn 1
   const turn1 = await chatWithHistory(
@@ -80,7 +81,7 @@ async function example3() {
 /**
  * Example 4: Using Weave op directly for custom functions
  */
-async function extractDinos(input) {
+async function extractDinos(input: string): Promise<string> {
   const response = await chat({
     systemPrompt: 'You are an expert at extracting structured data.',
     messages: [
@@ -96,7 +97,7 @@ async function extractDinos(input) {
 // Wrap the custom function with Weave tracing
 const extractDinosOp = weave.op(extractDinos);
 
-async function example4() {
+async function example4(): Promise<void> {
   console.log('\n=== Example 4: Custom Traced Function ===\n');
   
   const result = await extractDinosOp(
@@ -108,7 +109,7 @@ async function example4() {
 /**
  * Main function - Initialize Weave and run examples
  */
-async function main() {
+async function main(): Promise<void> {
   console.log('🚀 Wandb Inference + Weave Tracing Examples\n');
   
   // Initialize Weave tracing
@@ -128,7 +129,8 @@ async function main() {
     console.log('   Navigate to your project to see traces and metrics\n');
     
   } catch (error) {
-    console.error('❌ Error running examples:', error);
+    const err = error as Error;
+    console.error('❌ Error running examples:', err);
     throw error;
   }
 }
