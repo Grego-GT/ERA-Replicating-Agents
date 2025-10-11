@@ -27,20 +27,44 @@
 
 import * as weaveLib from "npm:weave";
 
+// Track if Weave has been initialized to prevent multiple initializations
+let isInitialized = false;
+const DEFAULT_PROJECT = 'agfactory';
+
 /**
  * Initialize Weave client
  * Call this at application startup with your project details
+ * Automatically prevents multiple initializations
  * 
- * @param {string} projectName - Your Wandb project name (e.g., "agfactory")
+ * @param {string} projectName - Your Wandb project name (default: "agfactory")
  * @returns {Promise<void>}
  */
-export async function init(projectName) {
+export async function init(projectName = DEFAULT_PROJECT) {
+  if (isInitialized) {
+    console.log(`⚠️ Weave already initialized for project: ${projectName}`);
+    return;
+  }
+  
   try {
     await weaveLib.init(projectName);
+    isInitialized = true;
     console.log(`✅ Weave initialized for project: ${projectName}`);
   } catch (error) {
     console.error('❌ Failed to initialize Weave:', error);
     throw error;
+  }
+}
+
+/**
+ * Ensure Weave is initialized before any operations
+ * Call this at the start of any function that needs Weave
+ * Safe to call multiple times - only initializes once
+ * 
+ * @returns {Promise<void>}
+ */
+export async function ensureInitialized() {
+  if (!isInitialized) {
+    await init(DEFAULT_PROJECT);
   }
 }
 

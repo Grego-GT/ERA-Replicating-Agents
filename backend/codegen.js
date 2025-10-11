@@ -43,20 +43,89 @@ function extractCode(response) {
 export async function generateCode(userPrompt, maxRetries = 3, model = "Qwen/Qwen3-Coder-480B-A35B-Instruct") {
   const systemPrompt = `You are a code generation assistant. Generate TypeScript/JavaScript code based on user requests.
 
-IMPORTANT REQUIREMENTS:
-1. Wrap your code in <code></code> tags
-2. The code MUST use console.log() to output results
-3. The code should be self-contained and executable
-4. Always log results in a structured format (preferably JSON)
-5. Include error handling where appropriate
+CRITICAL: Your code will be executed in a TypeScript sandbox. It MUST be valid TypeScript and produce reliable output.
 
-Example format:
+MANDATORY REQUIREMENTS:
+1. Wrap ALL code in <code></code> tags
+2. ALWAYS output results using console.log() with structured JSON
+3. Use ONLY standard JavaScript/TypeScript - no external imports or Node.js modules
+4. MUST include proper TypeScript error handling
+5. Output format MUST be valid JSON
+
+REQUIRED ERROR HANDLING PATTERN:
+Always wrap your code in a try-catch block with proper TypeScript error typing:
+
 <code>
-const result = someCalculation();
-console.log(JSON.stringify({ result, timestamp: new Date().toISOString() }));
+try {
+  // Your code here
+  const result = yourLogic();
+  
+  // REQUIRED: Always output as JSON
+  console.log(JSON.stringify({
+    success: true,
+    result: result,
+    timestamp: new Date().toISOString()
+  }));
+  
+} catch (error: unknown) {
+  // REQUIRED: Proper TypeScript error casting
+  const err = error as Error;
+  console.log(JSON.stringify({
+    success: false,
+    error: err.message,
+    timestamp: new Date().toISOString()
+  }));
+}
 </code>
 
-Generate clean, working code that can be executed immediately.`;
+EXAMPLES OF VALID OUTPUT:
+
+✅ CORRECT - Math operation:
+<code>
+try {
+  const factorial = (n: number): number => {
+    if (n <= 1) return 1;
+    return n * factorial(n - 1);
+  };
+  const result = factorial(5);
+  console.log(JSON.stringify({ success: true, result, timestamp: new Date().toISOString() }));
+} catch (error: unknown) {
+  const err = error as Error;
+  console.log(JSON.stringify({ success: false, error: err.message, timestamp: new Date().toISOString() }));
+}
+</code>
+
+✅ CORRECT - Data manipulation:
+<code>
+try {
+  const data = { name: "John", age: 30, email: "john@example.com" };
+  console.log(JSON.stringify({ success: true, result: data, timestamp: new Date().toISOString() }));
+} catch (error: unknown) {
+  const err = error as Error;
+  console.log(JSON.stringify({ success: false, error: err.message, timestamp: new Date().toISOString() }));
+}
+</code>
+
+❌ WRONG - Missing error typing:
+catch (error) { // This will fail TypeScript compilation!
+  console.log(error.message);
+}
+
+❌ WRONG - No structured output:
+console.log("The result is: " + result); // Not JSON!
+
+❌ WRONG - Multiple console.logs without JSON:
+console.log(result);
+console.log(timestamp);
+
+REMEMBER:
+- Every output MUST be JSON with success/result/error/timestamp
+- Every catch block MUST type error as "error: unknown"
+- Every error MUST be cast: "const err = error as Error"
+- No plain text outputs - only JSON
+- Test your logic mentally before outputting
+
+Generate clean, TypeScript-compliant code that will execute without errors.`;
 
   let lastResponse = null;
   let attempts = 0;
@@ -118,13 +187,13 @@ Generate clean, working code that can be executed immediately.`;
 }
 
 /**
- * Generate and execute code from a user prompt
+ * Generate and execute code from a user prompt (internal implementation)
  * 
  * @param {string} userPrompt - What the user wants the code to do
  * @param {object} options - Options for generation and execution
  * @returns {Promise<object>} Complete result with code, execution, and logs
  */
-export async function generateAndExecute(userPrompt, options = {}) {
+async function generateAndExecuteImpl(userPrompt, options = {}) {
   const {
     maxRetries = 3,
     language = 'typescript',
@@ -163,35 +232,80 @@ export async function generateAndExecute(userPrompt, options = {}) {
     // Step 2: Execute in Daytona
     logs.push(log('🏃 Executing code in Daytona sandbox...'));
     const execution = await runCode(generated.code, language);
-    logs.push(log('✅ Code executed', { 
-      hasResult: !!execution.result 
-    }));
+    
+    // Check for execution errors (TypeScript compilation errors or runtime errors)
+    const hasCompilationError = execution.result && (
+      execution.result.includes('error TS') || 
+      execution.result.includes('Error:') ||
+      execution.result.includes('SyntaxError:')
+    );
+    
+    // Try to parse JSON output to check for success flag
+    let parsedOutput = null;
+    let hasRuntimeError = false;
+    try {
+      if (execution.result && execution.result.trim().startsWith('{')) {
+        parsedOutput = JSON.parse(execution.result);
+        hasRuntimeError = parsedOutput.success === false;
+      }
+    } catch (e) {
+      // Not JSON or invalid JSON, that's okay
+    }
+    
+    const hasError = hasCompilationError || hasRuntimeError;
+    
+    if (hasError) {
+      logs.push(log('⚠️ Code executed with errors', { 
+        errorType: hasCompilationError ? 'compilation' : 'runtime',
+        error: execution.result,
+        code: generated.code,
+        parsedOutput
+      }));
+    } else {
+      logs.push(log('✅ Code executed successfully', { 
+        hasResult: !!execution.result,
+        parsedOutput
+      }));
+    }
     
     // Step 3: Parse and return results
     const result = {
-      success: true,
+      success: !hasError,
       prompt: userPrompt,
       generated: {
         code: generated.code,
         rawResponse: generated.rawResponse,
-        attempts: generated.attempts
+        attempts: generated.attempts,
+        model: generated.model
       },
       execution: {
         result: execution.result,
-        raw: execution
+        parsedOutput,
+        raw: execution,
+        hasError,
+        errorType: hasError ? (hasCompilationError ? 'compilation' : 'runtime') : null
       },
       logs
     };
     
-    logs.push(log('🎉 Complete!'));
+    logs.push(log(hasError ? '⚠️ Complete with errors' : '🎉 Complete!'));
     
     return result;
     
   } catch (error) {
-    logs.push(log('❌ Error', { error: error.message }));
+    logs.push(log('❌ Error', { 
+      error: error.message,
+      stack: error.stack 
+    }));
     throw error;
   }
 }
+
+/**
+ * Generate and execute code from a user prompt
+ * Traced with Weave for observability
+ */
+export const generateAndExecute = weave.op(generateAndExecuteImpl);
 
 /**
  * Run tests for code generation and execution
@@ -201,7 +315,7 @@ export async function testCodeGen() {
   
   // Initialize Weave for tracing
   console.log('🔍 Initializing Weave tracing...');
-  await weave.init('agfactory-codegen');
+  await weave.init();
   console.log('');
   
   const tests = [

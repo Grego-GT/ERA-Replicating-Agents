@@ -11,14 +11,12 @@
 import * as weave from "./weave.js";
 import { chat, simpleChat, chatWithHistory } from "./wandb.js";
 
-const TEST_PROJECT = 'agfactory-integration-test';
-
 console.log('🧪 Testing Weave Integration with Wandb Inference\n');
 
 // Test 1: Weave Initialization
 console.log('Test 1: Weave Initialization');
 try {
-  await weave.init(TEST_PROJECT);
+  await weave.init();
   console.log('✅ Weave initialized successfully\n');
 } catch (error) {
   console.error('❌ Weave initialization failed:', error);
@@ -105,7 +103,7 @@ console.log('✅ ALL TESTS PASSED!');
 console.log('='.repeat(50));
 console.log('\n📊 Check your Weave dashboard:');
 console.log(`   https://wandb.ai/`);
-console.log(`   Project: ${TEST_PROJECT}`);
+console.log(`   Project: agfactory`);
 console.log('\n🔍 You should see traces for:');
 console.log('   - simpleChat');
 console.log('   - chat');

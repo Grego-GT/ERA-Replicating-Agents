@@ -261,7 +261,7 @@ export async function runWandbTest() {
   try {
     // Initialize Weave for tracing
     console.log('🔍 Initializing Weave tracing...');
-    await weave.init('agfactory-wandb-test');
+    await weave.init();
     console.log('');
     
     // Test 1: Simple chat

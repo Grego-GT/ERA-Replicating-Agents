@@ -113,7 +113,7 @@ async function main() {
   
   // Initialize Weave tracing
   console.log('🔍 Initializing Weave...');
-  await weave.init('agfactory-examples');
+  await weave.init();
   console.log('✅ Weave initialized\n');
   
   // Run examples

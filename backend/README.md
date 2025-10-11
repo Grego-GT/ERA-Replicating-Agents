@@ -28,10 +28,12 @@ const tracedFunction = weave.op(myAIFunction);
 
 // Initialize and use
 async function main() {
-  await weave.init('my-project');
+  await weave.init(); // Defaults to 'agfactory' project
   const result = await tracedFunction('test input');
 }
 ```
+
+**Note:** All AgFactory modules use a single 'agfactory' Weave project. The `init()` function prevents multiple initializations automatically.
 
 ---
 
@@ -54,7 +56,7 @@ Main chat function with full control over parameters.
 import { chat } from './backend/wandb.js';
 import * as weave from './backend/weave.js';
 
-await weave.init('my-project');
+await weave.init(); // Initialize once for all AgFactory operations
 
 const response = await chat({
   model: "Qwen/Qwen3-Coder-480B-A35B-Instruct",
@@ -76,7 +78,7 @@ Simplified chat that returns just the text response.
 import { simpleChat } from './backend/wandb.js';
 import * as weave from './backend/weave.js';
 
-await weave.init('my-project');
+await weave.init();
 
 const response = await simpleChat('Tell me a joke.');
 console.log(response); // Just the text response
@@ -89,7 +91,7 @@ Maintains conversation context across multiple turns.
 import { chatWithHistory } from './backend/wandb.js';
 import * as weave from './backend/weave.js';
 
-await weave.init('my-project');
+await weave.init();
 
 let history = [];
 
@@ -107,7 +109,7 @@ Stream chat completions for real-time responses.
 import { streamChat } from './backend/wandb.js';
 import * as weave from './backend/weave.js';
 
-await weave.init('my-project');
+await weave.init();
 
 const stream = await streamChat({
   model: "Qwen/Qwen3-Coder-480B-A35B-Instruct",
@@ -182,12 +184,18 @@ Navigate to your project to see:
 
 1. **Always initialize Weave first:**
    ```javascript
-   await weave.init('project-name');
+   await weave.init(); // Uses 'agfactory' by default
+   ```
+   
+   Or call `ensureInitialized()` for automatic init:
+   ```javascript
+   await weave.ensureInitialized(); // Safe to call multiple times
    ```
 
-2. **Use descriptive project names:**
-   - Good: `'agfactory-production'`, `'my-agent-dev'`
-   - Avoid: `'test'`, `'project1'`
+2. **Single project for all operations:**
+   - All AgFactory modules use the 'agfactory' project
+   - No need to specify project names in most cases
+   - Prevents multiple project creation
 
 3. **Wrap custom AI functions:**
    ```javascript
