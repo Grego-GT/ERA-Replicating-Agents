@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AgFactory</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.12.3/dist/cdn.min.js"></script>
+</head>
+<body>
+  <div x-data="agFactory()" class="min-h-screen flex items-center justify-center bg-gray-50">
+    <h1 class="text-4xl font-bold text-gray-900">AGFACTORY</h1>
+  </div>
+
+  <script>
+    function agFactory() {
+      return {
+        init() {
+          console.log('AgFactory initialized');
+        }
+      }
+    }
+  </script>
+</body>
+</html>

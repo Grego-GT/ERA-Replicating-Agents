@@ -1,0 +1,52 @@
+{
+  "name": "AgFactory",
+  "exports": {
+    ".": "./main.js",
+    "./daytona": "./backend/daytona.js",
+    "./@daytonaio/sdk": "npm:@daytonaio/sdk"
+  },
+  "description": "Barebones Hono + Alpine.js application",
+  "tasks": {
+    "dev": "deno run --allow-net --allow-read --allow-env --watch main.js",
+    "serve": "deno serve --port 9995 --watch --allow-read --allow-env --allow-write --allow-net --allow-import ./main.js",
+    "git": "git add . && git commit -m 'bump' && git push origin jan",
+    "prod": "deployctl deploy --prod --project=agfactory",
+    "daytona": "deno run --allow-net --allow-read --allow-env backend/daytona.js",
+    "wandb": "deno run --allow-net --allow-read --allow-env backend/wandb.js"
+  },
+  "$schema": "https://raw.githubusercontent.com/denoland/deno/348900b8b79f4a434cab4c74b3bc8d4d2fa8ee74/cli/schemas/config-file.v1.json",
+  "lock": false,
+  "compilerOptions": {
+    "noImplicitAny": false,
+    "strict": true,
+    "lib": [
+      "deno.ns",
+      "deno.unstable"
+    ]
+  },
+  "lint": {
+    "rules": {
+      "exclude": [
+        "no-explicit-any"
+      ]
+    }
+  },
+  "node_modules_dir": false,
+  "imports": {
+    "weave": "npm:weave@latest",
+    "@daytonaio/sdk": "npm:@daytonaio/sdk@latest"
+  },
+  "experimental": {
+    "unstable-node-globals": true,
+    "unstable-worker-options": true,
+    "unstable-sloppy-imports": true
+  },
+  "deploy": {
+    "project": "1cf65472-e492-495f-99fe-5c0dca468991",
+    "exclude": [
+      "**/node_modules"
+    ],
+    "include": [],
+    "entrypoint": "main.js"
+  }
+}
