@@ -13,9 +13,7 @@
   "tasks": {
     "cli": "deno run --allow-read --allow-write --allow-env --allow-net --allow-sys cli.ts",
     "cli:create": "deno run --allow-read --allow-write --allow-env --allow-net --allow-sys cli.ts create",
-    "daytona": "deno run --allow-net --allow-read --allow-env --allow-sys backend/daytona.js",
     "codegen": "deno run --allow-net --allow-read --allow-env --allow-sys backend/codegen.js",
-    "wandb": "deno run --allow-net --allow-read --allow-env --allow-sys backend/wandb.js"
   },
   "$schema": "https://raw.githubusercontent.com/denoland/deno/348900b8b79f4a434cab4c74b3bc8d4d2fa8ee74/cli/schemas/config-file.v1.json",
   "lock": false,
