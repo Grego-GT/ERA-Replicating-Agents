@@ -4,6 +4,8 @@ import { Command } from 'commander';
 import inquirer from 'inquirer';
 import chalk from 'chalk';
 import figlet from 'figlet';
+import * as fs from 'fs';
+import * as path from 'path';
 import { version, description } from '../package.json';
 
 // ============================================================================
@@ -29,17 +31,60 @@ function displayBanner(): void {
 
 function handleCreateCommand(
   name: string,
-  options: { prompt?: string; model?: string }
+  options: { prompt?: string }
 ): void {
   console.log(chalk.green(`\n✅ Creating agent: ${chalk.bold(name)}`));
+  
   if (options.prompt) {
     console.log(chalk.blue(`💬 Prompt: ${chalk.bold(options.prompt)}`));
   }
-  if (options.model) {
-    console.log(chalk.magenta(`🤖 Model: ${chalk.bold(options.model)}`));
+
+  // Create agents directory if it doesn't exist
+  const agentsDir = path.join(process.cwd(), 'agents');
+  if (!fs.existsSync(agentsDir)) {
+    fs.mkdirSync(agentsDir, { recursive: true });
+    console.log(chalk.gray(`   📁 Created agents directory`));
   }
-  console.log(chalk.gray('   (This is a demo - implement your agent creation logic here)'));
-  console.log(chalk.green('   Done! ✨\n'));
+
+  // Create agent-specific directory
+  const agentDir = path.join(agentsDir, name);
+  if (fs.existsSync(agentDir)) {
+    console.log(chalk.yellow(`   ⚠️  Agent "${name}" already exists, overwriting...`));
+  } else {
+    fs.mkdirSync(agentDir, { recursive: true });
+  }
+
+  // Generate the agent TypeScript file
+  const agentCode = generateAgentCode(name, options.prompt);
+  const agentFilePath = path.join(agentDir, 'index.ts');
+  fs.writeFileSync(agentFilePath, agentCode);
+
+  console.log(chalk.green(`   ✨ Agent created at: ${chalk.bold(`agents/${name}/index.ts`)}`));
+  console.log(chalk.gray(`\n   Run it with: ${chalk.white(`ts-node agents/${name}/index.ts`)}`));
+  console.log(chalk.green('\n   Done! ✨\n'));
+}
+
+function generateAgentCode(name: string, prompt?: string): string {
+  const promptComment = prompt 
+    ? `/**
+ * Agent: ${name}
+ * Prompt: ${prompt}
+ */
+
+` 
+    : `/**
+ * Agent: ${name}
+ */
+
+`;
+
+  return `${promptComment}function main(): void {
+  console.log('Hello World');
+  console.log('Agent "${name}" is running!');
+}
+
+main();
+`;
 }
 
 // ============================================================================
@@ -114,7 +159,6 @@ async function handleCreateInteractive(): Promise<void> {
 
   handleCreateCommand(answers.name, {
     prompt: answers.prompt,
-    model: answers.model,
   });
 }
 
@@ -135,7 +179,7 @@ program
   .description('Create a new agent')
   .argument('<name>', 'Name of the agent')
   .option('-p, --prompt <prompt>', 'Agent prompt/instructions')
-  .action((name: string, options: { prompt?: string; model?: string }) => {
+  .action((name: string, options: { prompt?: string }) => {
     handleCreateCommand(name, options);
   });
 
