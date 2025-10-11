@@ -1,9 +1,133 @@
 #!/usr/bin/env node
 
 import { Command } from 'commander';
+import inquirer from 'inquirer';
+import chalk from 'chalk';
+import figlet from 'figlet';
 import { version, description } from '../package.json';
-import { startInteractiveMode } from './interactive';
-import { handleHelloCommand, handleCreateCommand, handleListCommand } from './commands';
+
+// ============================================================================
+// Banner
+// ============================================================================
+
+function displayBanner(): void {
+  const banner = figlet.textSync('AgFactory', {
+    font: 'Standard',
+    horizontalLayout: 'default',
+    verticalLayout: 'default',
+  });
+
+  console.clear();
+  console.log(chalk.cyan(banner));
+  console.log(chalk.gray('  Agentic agent factory'));
+  console.log(chalk.gray(`  Version: ${version}\n`));
+}
+
+// ============================================================================
+// Command Handler
+// ============================================================================
+
+function handleCreateCommand(
+  name: string,
+  options: { prompt?: string; model?: string }
+): void {
+  console.log(chalk.green(`\n✅ Creating agent: ${chalk.bold(name)}`));
+  if (options.prompt) {
+    console.log(chalk.blue(`💬 Prompt: ${chalk.bold(options.prompt)}`));
+  }
+  if (options.model) {
+    console.log(chalk.magenta(`🤖 Model: ${chalk.bold(options.model)}`));
+  }
+  console.log(chalk.gray('   (This is a demo - implement your agent creation logic here)'));
+  console.log(chalk.green('   Done! ✨\n'));
+}
+
+// ============================================================================
+// Interactive Mode
+// ============================================================================
+
+async function startInteractiveMode(): Promise<void> {
+  displayBanner();
+
+  console.log(chalk.cyan('🚀 Welcome to AgFactory CLI!\n'));
+  console.log(chalk.gray('Create AI agents with custom prompts\n'));
+
+  let continueLoop = true;
+
+  while (continueLoop) {
+    const { action } = await inquirer.prompt([
+      {
+        type: 'list',
+        name: 'action',
+        message: chalk.yellow('What would you like to do?'),
+        choices: [
+          {
+            name: chalk.blue('🤖 Create an Agent'),
+            value: 'create',
+          },
+          new inquirer.Separator(),
+          {
+            name: chalk.red('❌ Exit'),
+            value: 'exit',
+          },
+        ],
+      },
+    ]);
+
+    console.log(); // Empty line for spacing
+
+    if (action === 'create') {
+      await handleCreateInteractive();
+      console.log(chalk.gray('\n' + '─'.repeat(50) + '\n'));
+    } else if (action === 'exit') {
+      console.log(chalk.cyan('\n👋 Thanks for using AgFactory CLI! Goodbye!\n'));
+      continueLoop = false;
+    }
+  }
+}
+
+async function handleCreateInteractive(): Promise<void> {
+  const answers = await inquirer.prompt([
+    {
+      type: 'input',
+      name: 'name',
+      message: chalk.yellow('Enter the agent name:'),
+      validate: (input) => {
+        if (input.trim().length === 0) {
+          return 'Agent name cannot be empty!';
+        }
+        return true;
+      },
+    },
+    {
+      type: 'input',
+      name: 'prompt',
+      message: chalk.yellow('Enter the agent prompt:'),
+      validate: (input) => {
+        if (input.trim().length === 0) {
+          return 'Prompt cannot be empty!';
+        }
+        return true;
+      },
+    },
+    {
+      type: 'list',
+      name: 'model',
+      message: chalk.yellow('Select AI model:'),
+      choices: ['gpt-4', 'gpt-3.5-turbo', 'claude-3-opus', 'claude-3-sonnet'],
+      default: 'gpt-4',
+    },
+  ]);
+
+  handleCreateCommand(answers.name, {
+    prompt: answers.prompt,
+    model: answers.model,
+  });
+}
+
+// ============================================================================
+// CLI Setup
+// ============================================================================
 
 const program = new Command();
 
@@ -12,35 +136,15 @@ program
   .description(description)
   .version(version);
 
-// Hello command
-program
-  .command('hello')
-  .description('Say hello')
-  .argument('[name]', 'Name to greet', 'World')
-  .option('-u, --uppercase', 'Output in uppercase')
-  .action((name: string, options: { uppercase?: boolean }) => {
-    handleHelloCommand(name, options);
-  });
-
 // Create command
 program
   .command('create')
-  .description('Create a new resource')
-  .argument('<type>', 'Type of resource to create (e.g., project, file)')
-  .argument('<name>', 'Name of the resource')
-  .option('-t, --template <template>', 'Template to use')
-  .action((type: string, name: string, options: { template?: string }) => {
-    handleCreateCommand(type, name, options);
-  });
-
-// List command
-program
-  .command('list')
-  .description('List all resources')
-  .option('-a, --all', 'Show all resources including hidden ones')
-  .option('-s, --sort <field>', 'Sort by field', 'name')
-  .action((options: { all?: boolean; sort?: string }) => {
-    handleListCommand(options);
+  .description('Create a new agent')
+  .argument('<name>', 'Name of the agent')
+  .option('-p, --prompt <prompt>', 'Agent prompt/instructions')
+  .option('-m, --model <model>', 'AI model to use')
+  .action((name: string, options: { prompt?: string; model?: string }) => {
+    handleCreateCommand(name, options);
   });
 
 // Interactive command (explicit)
@@ -62,4 +166,3 @@ if (!process.argv.slice(2).length) {
     process.exit(1);
   });
 }
-
