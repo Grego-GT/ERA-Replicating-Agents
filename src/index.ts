@@ -110,13 +110,6 @@ async function handleCreateInteractive(): Promise<void> {
         return true;
       },
     },
-    {
-      type: 'list',
-      name: 'model',
-      message: chalk.yellow('Select AI model:'),
-      choices: ['gpt-4', 'gpt-3.5-turbo', 'claude-3-opus', 'claude-3-sonnet'],
-      default: 'gpt-4',
-    },
   ]);
 
   handleCreateCommand(answers.name, {
@@ -142,7 +135,6 @@ program
   .description('Create a new agent')
   .argument('<name>', 'Name of the agent')
   .option('-p, --prompt <prompt>', 'Agent prompt/instructions')
-  .option('-m, --model <model>', 'AI model to use')
   .action((name: string, options: { prompt?: string; model?: string }) => {
     handleCreateCommand(name, options);
   });

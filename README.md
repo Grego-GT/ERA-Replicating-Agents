@@ -75,6 +75,7 @@ pnpm run dev
 ```
 
 You'll be guided through:
+
 1. Agent name selection
 2. Prompt/instructions input
 3. AI model selection (gpt-4, gpt-3.5-turbo, claude-3-opus, claude-3-sonnet)
@@ -92,6 +93,7 @@ pnpm run dev -- create my-agent -p "Translate text to Spanish" -m claude-3-opus
 ```
 
 **Options:**
+
 - `-p, --prompt <prompt>` - Agent prompt/instructions
 - `-m, --model <model>` - AI model to use
 
