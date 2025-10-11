@@ -4,10 +4,9 @@ Agentic agent factory - create AI agents with custom prompts.
 
 ## ✨ Features
 
-- 🤖 **Agent Creation** - Create AI agents with custom prompts and models
-- 🎨 **Beautiful UI** - Styled output with Chalk and ASCII art banners
+- 🤖 **Agent Creation** - Create AI agents with custom prompts
+- 📁 **File Generation** - Generates working TypeScript files for each agent
 - 🤝 **Interactive Mode** - User-friendly prompts with Inquirer.js
-- ⚡ **TypeScript** - Fully typed with TypeScript for better DX
 - 📦 **Single File** - Simple, consolidated codebase
 - 🚀 **pnpm** - Fast, efficient package manager
 
@@ -21,7 +20,7 @@ pnpm install
 pnpm run dev
 
 # Or create an agent directly
-pnpm run dev -- create my-agent -p "You are a helpful assistant" -m gpt-4
+pnpm run dev -- create my-agent -p "You are a helpful assistant"
 ```
 
 ## Installation
@@ -76,9 +75,10 @@ pnpm run dev
 
 You'll be guided through:
 
-1. Agent name selection
-2. Prompt/instructions input
-3. AI model selection (gpt-4, gpt-3.5-turbo, claude-3-opus, claude-3-sonnet)
+1. Agent name input (with validation)
+2. Prompt/instructions input (with validation)
+
+Each agent is created in the `agents/` folder with a working TypeScript file that you can run immediately.
 
 ### Command Line Mode
 
@@ -88,14 +88,27 @@ Create an agent directly from the command line:
 # Create an agent with a prompt
 pnpm run dev -- create my-agent --prompt "You are a helpful coding assistant"
 
-# Specify a model
-pnpm run dev -- create my-agent -p "Translate text to Spanish" -m claude-3-opus
+# Create without a prompt
+pnpm run dev -- create simple-agent
 ```
 
 **Options:**
 
-- `-p, --prompt <prompt>` - Agent prompt/instructions
-- `-m, --model <model>` - AI model to use
+- `-p, --prompt <prompt>` - Agent prompt/instructions (optional)
+
+### Running Your Agents
+
+After creating an agent, you can run it with:
+
+```bash
+# Run with ts-node
+ts-node agents/my-agent/index.ts
+
+# Or with pnpm
+pnpm exec ts-node agents/my-agent/index.ts
+```
+
+Each agent is a self-contained TypeScript file that prints "Hello World" and identifies itself
 
 ## Project Structure
 
@@ -103,6 +116,11 @@ pnpm run dev -- create my-agent -p "Translate text to Spanish" -m claude-3-opus
 AgFactory/
 ├── src/
 │   └── index.ts              # Single file with all functionality
+├── agents/                   # Generated agents (gitignored)
+│   ├── my-agent/
+│   │   └── index.ts          # Generated agent file
+│   └── another-agent/
+│       └── index.ts          # Generated agent file
 ├── dist/                     # Compiled JavaScript (generated)
 ├── package.json              # Project config (uses pnpm)
 ├── pnpm-lock.yaml            # pnpm lockfile
@@ -111,6 +129,8 @@ AgFactory/
 ├── .gitignore
 └── README.md
 ```
+
+**Note:** The `agents/` folder is gitignored by default. Generated agents are meant to be customized locally.
 
 ## Extending the CLI
 
@@ -135,7 +155,7 @@ pnpm run build
 pnpm link --global
 
 # Use it anywhere
-agfactory create my-agent -p "You are helpful" -m gpt-4
+agfactory create my-agent -p "You are helpful"
 ```
 
 To publish to npm:

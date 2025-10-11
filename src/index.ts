@@ -34,6 +34,7 @@ function handleCreateCommand(
   options: { prompt?: string }
 ): void {
   console.log(chalk.green(`\n✅ Creating agent: ${chalk.bold(name)}`));
+  console.log(chalk.gray(`   Debug - options:`, JSON.stringify(options, null, 2)));
   
   if (options.prompt) {
     console.log(chalk.blue(`💬 Prompt: ${chalk.bold(options.prompt)}`));
@@ -179,7 +180,8 @@ program
   .description('Create a new agent')
   .argument('<name>', 'Name of the agent')
   .option('-p, --prompt <prompt>', 'Agent prompt/instructions')
-  .action((name: string, options: { prompt?: string }) => {
+  .action((name, options) => {
+    console.log('Action called with:', { name, options });
     handleCreateCommand(name, options);
   });
 
