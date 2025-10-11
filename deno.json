@@ -18,12 +18,10 @@
     "serve": "deno serve --port 9995 --watch --allow-read --allow-env --allow-write --allow-net --allow-sys --allow-import ./main.ts",
     "git": "git add . && git commit -m 'bump' && git push origin main",
     "prod": "deployctl deploy --prod --project=agfactory",
-    "daytona": "deno run --allow-net --allow-read --allow-env --allow-sys backend/daytona.ts",
-    "codegen": "deno run --allow-net --allow-read --allow-env --allow-sys backend/codegen.ts",
-    "wandb": "deno run --allow-net --allow-read --allow-env --allow-sys backend/wandb.ts",
     "test:wandb": "deno run --allow-net --allow-env --allow-sys backend/wandb.ts",
     "test:daytona": "deno run --allow-net --allow-env --allow-sys backend/daytona.ts",
     "test:codegen": "deno run --allow-net --allow-env --allow-sys backend/codegen.ts",
+    "test:fbi": "deno run --allow-net --allow-read --allow-env --allow-sys backend/fbi.ts",
     "test:weave": "deno run --allow-net --allow-env --allow-sys backend/test-weave-integration.ts",
     "example:wandb-weave": "deno run --allow-net --allow-env --allow-sys backend/wandb-weave-example.ts"
   },

@@ -37,6 +37,13 @@ import {
   runWandbTest
 } from './wandb.ts';
 
+// FBI orchestrator - Agent workflow orchestration
+import {
+  orchestrate,
+  run as orchestratorRun,
+  testOrchestrator
+} from './fbi.ts';
+
 // Export all backend modules
 export {
   // Weave tracing
@@ -58,7 +65,11 @@ export {
   chat,
   simpleChat,
   chatWithHistory,
-  runWandbTest
+  runWandbTest,
+  // FBI orchestrator
+  orchestrate,
+  orchestratorRun,
+  testOrchestrator
 };
 
 // Legacy backend object for backward compatibility
@@ -85,6 +96,11 @@ export const backend = {
     simpleChat,
     chatWithHistory,
     test: runWandbTest
+  },
+  fbi: {
+    orchestrate,
+    run: orchestratorRun,
+    test: testOrchestrator
   },
   placeholder: () => {
     console.log('Backend module placeholder');

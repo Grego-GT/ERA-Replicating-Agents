@@ -8,7 +8,7 @@
 import { parse } from "https://deno.land/std@0.208.0/flags/mod.ts";
 import { exists } from "https://deno.land/std@0.208.0/fs/mod.ts";
 import { join } from "https://deno.land/std@0.208.0/path/mod.ts";
-import { generateCode } from "./backend/codegen.js";
+import { run as orchestratorRun } from "./backend/fbi.ts";
 
 // ============================================================================
 // ANSI Colors (replacing chalk)
@@ -124,21 +124,39 @@ function formatAIGeneratedCode(name: string, promptText: string, generatedCode: 
 async function createAgentWithAI(name: string, promptText: string): Promise<void> {
   console.log(colorize(`\n🤖 Generating AI-powered agent: ${colorize(name, "bold")}`, "green"));
   console.log(colorize(`💬 Prompt: ${colorize(promptText, "bold")}`, "blue"));
-  console.log(colorize('\n⏳ Calling AI code generation (this may take a few seconds)...\n', "cyan"));
+  console.log(colorize('\n⏳ Calling FBI orchestrator (AI code generation + execution)...\n', "cyan"));
   
   try {
-    // Call the backend code generation
-    const result = await generateCode(promptText, 3);
+    // Call the FBI orchestrator (generation + execution)
+    const result = await orchestratorRun(promptText, {
+      maxRetries: 3,
+      logCallback: (log) => {
+        // Show important log messages
+        if (log.level === 'error' || log.level === 'warning') {
+          const icon = log.level === 'error' ? '❌' : '⚠️';
+          console.log(colorize(`   ${icon} ${log.message}`, log.level === 'error' ? 'red' : 'yellow'));
+        }
+      }
+    });
     
     if (!result.success) {
-      throw new Error('Code generation failed');
+      throw new Error(
+        result.execution.hasError 
+          ? `Execution failed: ${result.execution.errorType}` 
+          : 'Code generation failed'
+      );
     }
     
-    console.log(colorize('\n✅ AI code generation successful!', "green"));
+    console.log(colorize('\n✅ AI code generation and validation successful!', "green"));
     console.log(colorize('📝 Generated code preview:', "gray"));
     console.log(colorize('─'.repeat(60), "gray"));
-    console.log(result.code.substring(0, 300) + (result.code.length > 300 ? '...' : ''));
+    console.log(result.generation.code.substring(0, 300) + (result.generation.code.length > 300 ? '...' : ''));
     console.log(colorize('─'.repeat(60), "gray"));
+    
+    if (result.execution.parsedOutput) {
+      console.log(colorize('✅ Execution validated:', "green"));
+      console.log(colorize(`   ${JSON.stringify(result.execution.parsedOutput, null, 2)}`, "gray"));
+    }
     
     // Create agents directory if it doesn't exist
     const agentsDir = join(Deno.cwd(), "agents");
@@ -156,31 +174,39 @@ async function createAgentWithAI(name: string, promptText: string): Promise<void
     }
 
     // Format and save the generated code
-    const agentCode = formatAIGeneratedCode(name, promptText, result.code, {
-      model: result.model,
-      attempts: result.attempts
+    const agentCode = formatAIGeneratedCode(name, promptText, result.generation.code, {
+      model: result.generation.model,
+      attempts: result.generation.attempts
     });
     const agentFilePath = join(agentDir, "index.ts");
     await Deno.writeTextFile(agentFilePath, agentCode);
     
-    // Also save the raw generation metadata
+    // Also save the full orchestration metadata
     const metadataPath = join(agentDir, "generation-metadata.json");
     await Deno.writeTextFile(metadataPath, JSON.stringify({
       name,
       prompt: promptText,
-      model: result.model,
-      attempts: result.attempts,
+      model: result.generation.model,
+      attempts: result.generation.attempts,
       generatedAt: new Date().toISOString(),
-      rawResponse: result.rawResponse
+      rawResponse: result.generation.rawResponse,
+      execution: {
+        success: result.execution.success,
+        errorType: result.execution.errorType,
+        parsedOutput: result.execution.parsedOutput
+      },
+      duration: result.duration
     }, null, 2));
 
     console.log(colorize(`\n   ✨ AI-generated agent created at: ${colorize(`agents/${name}/index.ts`, "bold")}`, "green"));
     console.log(colorize(`   📋 Metadata saved at: ${colorize(`agents/${name}/generation-metadata.json`, "bold")}`, "gray"));
+    console.log(colorize(`   ⏱️  Duration: ${result.duration.total}ms (gen: ${result.duration.generation}ms, exec: ${result.duration.execution}ms)`, "gray"));
     console.log(colorize(`\n   Run it with: ${colorize(`deno run agents/${name}/index.ts`, "bold")}`, "gray"));
     console.log(colorize('\n   Done! ✨\n', "green"));
     
   } catch (error) {
-    console.log(colorize(`\n❌ AI code generation failed: ${error.message}`, "red"));
+    const err = error as Error;
+    console.log(colorize(`\n❌ AI code generation failed: ${err.message}`, "red"));
     console.log(colorize('\n💡 Tip: Make sure you have set WANDB_API_KEY and DAYTONA_API_KEY in .env', "yellow"));
     console.log(colorize('    Falling back to simple template...\n', "gray"));
     

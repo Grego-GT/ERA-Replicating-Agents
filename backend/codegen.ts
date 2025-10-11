@@ -294,7 +294,12 @@ Generate clean, TypeScript-compliant code that will execute without errors.`;
 }
 
 /**
- * Generate and execute code from a user prompt (internal implementation)
+ * Generate and execute code from a user prompt (DEPRECATED)
+ * 
+ * @deprecated Use FBI orchestrator (backend/fbi.ts) instead for better separation of concerns
+ * 
+ * This function is kept for backwards compatibility but will be removed in a future version.
+ * Use orchestrate() from backend/fbi.ts instead.
  * 
  * @param userPrompt - What the user wants the code to do
  * @param options - Options for generation and execution
@@ -415,6 +420,8 @@ async function generateAndExecuteImpl(
 /**
  * Generate and execute code from a user prompt
  * Traced with Weave for observability
+ * 
+ * @deprecated Use FBI orchestrator (backend/fbi.ts) instead
  */
 export const generateAndExecute = weave.op(generateAndExecuteImpl);
 
