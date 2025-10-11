@@ -22,6 +22,13 @@ import {
   runDaytonaTest
 } from './daytona.js';
 
+// Code generation and execution
+import {
+  generateCode,
+  generateAndExecute,
+  testCodeGen
+} from './codegen.js';
+
 // Export all backend modules
 export {
   // Weave tracing
@@ -34,7 +41,11 @@ export {
   initDaytona,
   runCode,
   runMath,
-  runDaytonaTest
+  runDaytonaTest,
+  // Code generation
+  generateCode,
+  generateAndExecute,
+  testCodeGen
 };
 
 // Legacy backend object for backward compatibility
@@ -50,6 +61,11 @@ export const backend = {
     run: runCode,
     math: runMath,
     test: runDaytonaTest
+  },
+  codegen: {
+    generate: generateCode,
+    execute: generateAndExecute,
+    test: testCodeGen
   },
   placeholder: () => {
     console.log('Backend module placeholder');

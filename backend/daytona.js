@@ -50,9 +50,19 @@ export async function runCode(code, language = 'typescript') {
     // Run the code
     const response = await sandbox.process.codeRun(code);
     
-    // Clean up
-    await sandbox.remove();
-    console.log('✅ Sandbox cleaned up');
+    // Clean up (try different methods)
+    try {
+      if (typeof sandbox.remove === 'function') {
+        await sandbox.remove();
+      } else if (typeof sandbox.delete === 'function') {
+        await sandbox.delete();
+      } else if (typeof sandbox.destroy === 'function') {
+        await sandbox.destroy();
+      }
+      console.log('✅ Sandbox cleaned up');
+    } catch (cleanupError) {
+      console.warn('⚠️ Sandbox cleanup skipped:', cleanupError.message);
+    }
     
     return response;
     
@@ -103,9 +113,19 @@ export async function runMath(a, b, operator = '+') {
     // Run the code
     const response = await sandbox.process.codeRun(code);
     
-    // Clean up
-    await sandbox.remove();
-    console.log('✅ Sandbox cleaned up');
+    // Clean up (try different methods)
+    try {
+      if (typeof sandbox.remove === 'function') {
+        await sandbox.remove();
+      } else if (typeof sandbox.delete === 'function') {
+        await sandbox.delete();
+      } else if (typeof sandbox.destroy === 'function') {
+        await sandbox.destroy();
+      }
+      console.log('✅ Sandbox cleaned up');
+    } catch (cleanupError) {
+      console.warn('⚠️ Sandbox cleanup skipped:', cleanupError.message);
+    }
     
     // Parse the result
     const resultText = response.result;
