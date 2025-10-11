@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Agentic agent factory - create agents with prompts. Includes Hono server and CLI.",
   "exports": {
-    ".": "./core/main.js",
+    ".": "./core/main.ts",
     "./cli": "./cli.ts",
     "./daytona": "./core/backend/daytona.ts",
     "./weave": "./core/backend/weave.ts",
@@ -14,8 +14,8 @@
   "tasks": {
     "cli": "deno run --allow-read --allow-write --allow-env --allow-net --allow-sys cli.ts",
     "cli:create": "deno run --allow-read --allow-write --allow-env --allow-net --allow-sys cli.ts create",
-    "dev": "deno run --allow-net --allow-read --allow-env --allow-sys --watch main.js",
-    "serve": "deno serve --port 9995 --watch --allow-read --allow-env --allow-write --allow-net --allow-sys --allow-import ./main.js",
+    "dev": "deno run --allow-net --allow-read --allow-env --allow-sys --watch main.ts",
+    "serve": "deno serve --port 9995 --watch --allow-read --allow-env --allow-write --allow-net --allow-sys --allow-import ./main.ts",
     "git": "git add . && git commit -m 'bump' && git push origin main",
     "prod": "deployctl deploy --prod --project=agfactory",
     "daytona": "deno run --allow-net --allow-read --allow-env --allow-sys backend/daytona.ts",
@@ -77,7 +77,7 @@
       "**/.git"
     ],
     "include": [],
-    "entrypoint": "core/main.js"
+    "entrypoint": "core/main.ts"
   }
 }
 
