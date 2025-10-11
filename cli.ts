@@ -122,7 +122,7 @@ function formatAIGeneratedCode(name: string, promptText: string, generatedCode: 
 }
 
 async function createAgentWithAI(name: string, promptText: string): Promise<void> {
-  console.log(colorize(`\n🤖 Generating AI-powered agent: ${colorize(name, "bold")}`, "green"));
+  console.log(colorize(`\n🤖 Creating agent: ${colorize(name, "bold")}`, "green"));
   console.log(colorize(`💬 Prompt: ${colorize(promptText, "bold")}`, "blue"));
   console.log(colorize('\n⏳ Calling FBI orchestrator (AI code generation + execution)...\n', "cyan"));
   
