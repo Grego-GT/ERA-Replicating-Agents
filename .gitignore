@@ -1,14 +1,15 @@
-# Deno
-.deno/
-
-# Generated agents (local development)
-agents/
-
 # Environment variables
 .env
 .env.local
 
-# IDE
+# Deno
+.deno/
+deno.lock
+
+# Generated agents (local development)
+agents/
+
+# IDE/Editor
 .vscode/
 .idea/
 *.swp
@@ -17,6 +18,7 @@ agents/
 # Logs
 logs/
 *.log
+npm-debug.log*
 
 # OS
 .DS_Store
