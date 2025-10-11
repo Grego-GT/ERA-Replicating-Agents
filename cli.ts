@@ -9,6 +9,7 @@ import { parse } from "https://deno.land/std@0.208.0/flags/mod.ts";
 import { exists } from "https://deno.land/std@0.208.0/fs/mod.ts";
 import { join } from "https://deno.land/std@0.208.0/path/mod.ts";
 import { run as orchestratorRun } from "./backend/fbi.ts";
+import * as History from "./history.ts";
 
 // ============================================================================
 // ANSI Colors (replacing chalk)
@@ -126,6 +127,9 @@ async function createAgentWithAI(name: string, promptText: string): Promise<void
   console.log(colorize(`💬 Prompt: ${colorize(promptText, "bold")}`, "blue"));
   console.log(colorize('\n⏳ Calling FBI orchestrator (AI code generation + execution)...\n', "cyan"));
   
+  // Initialize history tracking
+  const history = History.createHistoryEntry(name, promptText);
+  
   try {
     // Call the FBI orchestrator (generation + execution)
     const result = await orchestratorRun(promptText, {
@@ -187,6 +191,7 @@ async function createAgentWithAI(name: string, promptText: string): Promise<void
     await Deno.writeTextFile(metadataPath, JSON.stringify(result.history, null, 2));
 
     console.log(colorize(`\n   ✨ AI-generated agent created at: ${colorize(`agents/${name}/index.ts`, "bold")}`, "green"));
+    console.log(colorize(`   📊 History metadata saved at: ${colorize(`agents/${name}/history.json`, "bold")}`, "cyan"));
     console.log(colorize(`   📋 Metadata saved at: ${colorize(`agents/${name}/generation-metadata.json`, "bold")}`, "gray"));
     console.log(colorize(`   ⏱️  Duration: ${result.duration.total}ms (gen: ${result.duration.generation}ms, exec: ${result.duration.execution}ms)`, "gray"));
     console.log(colorize(`\n   Run it with: ${colorize(`deno run agents/${name}/index.ts`, "bold")}`, "gray"));
@@ -197,6 +202,25 @@ async function createAgentWithAI(name: string, promptText: string): Promise<void
     console.log(colorize(`\n❌ AI code generation failed: ${err.message}`, "red"));
     console.log(colorize('\n💡 Tip: Make sure you have set WANDB_API_KEY and DAYTONA_API_KEY in .env', "yellow"));
     console.log(colorize('    Falling back to simple template...\n', "gray"));
+    
+    // Record error in history
+    History.addError(history, error);
+    
+    // Try to save history even on failure
+    try {
+      const agentsDir = join(Deno.cwd(), "agents");
+      const agentDir = join(agentsDir, name);
+      if (!(await exists(agentsDir))) {
+        await Deno.mkdir(agentsDir, { recursive: true });
+      }
+      if (!(await exists(agentDir))) {
+        await Deno.mkdir(agentDir, { recursive: true });
+      }
+      const historyPath = join(agentDir, "history.json");
+      await History.saveHistory(history, historyPath);
+    } catch (saveError) {
+      console.log(colorize(`   ⚠️  Could not save history: ${saveError.message}`, "gray"));
+    }
     
     // Fallback to simple generation
     await createAgentSimple(name, promptText);
@@ -250,10 +274,10 @@ async function startInteractiveMode(): Promise<void> {
   while (continueLoop) {
     const action = await select(
       'What would you like to do?',
-      ['🤖 Create an Agent (AI-powered)', '📝 Create an Agent (Simple template)', '❌ Exit']
+      ['🤖 Create an Agent', '❌ Exit']
     );
 
-    if (action.includes('AI-powered')) {
+    if (action.includes('Create an Agent')) {
       console.log(); // Empty line for spacing
       
       // Get agent name
@@ -273,22 +297,6 @@ async function startInteractiveMode(): Promise<void> {
       await createAgentWithAI(name, promptText);
       console.log(colorize('─'.repeat(50) + '\n', "gray"));
       
-    } else if (action.includes('Simple template')) {
-      console.log(); // Empty line for spacing
-      
-      // Get agent name
-      const name = await prompt('Enter the agent name:');
-      if (name.trim().length === 0) {
-        console.log(colorize('Agent name cannot be empty!', "red"));
-        continue;
-      }
-
-      // Get agent prompt
-      const promptText = await prompt('Enter the agent prompt (optional):');
-
-      await createAgentSimple(name, promptText || undefined);
-      console.log(colorize('─'.repeat(50) + '\n', "gray"));
-      
     } else if (action.includes('Exit')) {
       console.log(colorize('\n👋 Thanks for using AgFactory CLI! Goodbye!\n', "cyan"));
       continueLoop = false;
@@ -303,9 +311,7 @@ async function startInteractiveMode(): Promise<void> {
 async function handleCommandLine(args: string[]): Promise<void> {
   const flags = parse(args, {
     string: ["prompt", "p"],
-    boolean: ["ai", "simple"],
-    alias: { p: "prompt" },
-    default: { ai: false, simple: false }
+    alias: { p: "prompt" }
   });
 
   const command = flags._[0]?.toString();
@@ -315,7 +321,7 @@ async function handleCommandLine(args: string[]): Promise<void> {
     
     if (!name) {
       console.log(colorize('❌ Error: Agent name is required', "red"));
-      console.log(colorize('Usage: deno task cli:create <name> --prompt "Your prompt" [--ai|--simple]', "gray"));
+      console.log(colorize('Usage: deno task cli:create <name> --prompt "Your prompt"', "gray"));
       Deno.exit(1);
     }
 
@@ -323,20 +329,12 @@ async function handleCommandLine(args: string[]): Promise<void> {
     
     if (!promptText) {
       console.log(colorize('❌ Error: Prompt is required', "red"));
-      console.log(colorize('Usage: deno task cli:create <name> --prompt "Your prompt" [--ai|--simple]', "gray"));
+      console.log(colorize('Usage: deno task cli:create <name> --prompt "Your prompt"', "gray"));
       Deno.exit(1);
     }
     
-    // Determine generation method
-    if (flags.ai) {
-      await createAgentWithAI(name, promptText);
-    } else if (flags.simple) {
-      await createAgentSimple(name, promptText);
-    } else {
-      // Default to AI generation
-      console.log(colorize('💡 Using AI generation (use --simple for template-only)', "gray"));
-      await createAgentWithAI(name, promptText);
-    }
+    // Always use AI generation
+    await createAgentWithAI(name, promptText);
   } else if (command === "help" || command === "--help" || command === "-h") {
     displayHelp();
   } else {
@@ -348,23 +346,19 @@ async function handleCommandLine(args: string[]): Promise<void> {
 function displayHelp(): void {
   console.log(colorize('\nAgFactory CLI - AI-Powered Agent Factory\n', "cyan"));
   console.log(colorize('Usage:', "yellow"));
-  console.log('  deno task cli                                    # Interactive mode');
-  console.log('  deno task cli:create <name> -p "prompt" [flags]  # Command line mode\n');
+  console.log('  deno task cli                           # Interactive mode');
+  console.log('  deno task cli:create <name> -p "prompt" # Command line mode\n');
   console.log(colorize('Commands:', "yellow"));
   console.log('  create <name>           Create a new agent');
   console.log('  help                    Show this help message\n');
   console.log(colorize('Options:', "yellow"));
-  console.log('  -p, --prompt <text>     Agent prompt/instructions (required)');
-  console.log('  --ai                    Use AI code generation (default)');
-  console.log('  --simple                Use simple template (no AI)\n');
+  console.log('  -p, --prompt <text>     Agent prompt/instructions (required)\n');
   console.log(colorize('Examples:', "yellow"));
   console.log('  # Interactive mode (recommended)');
   console.log('  deno task cli\n');
-  console.log('  # AI-powered generation (default)');
+  console.log('  # Command line mode');
   console.log('  deno task cli:create calculator -p "Create a calculator that adds two numbers"\n');
-  console.log('  # Simple template');
-  console.log('  deno task cli:create hello --simple -p "Say hello"\n');
-  console.log(colorize('Requirements for AI generation:', "yellow"));
+  console.log(colorize('Requirements:', "yellow"));
   console.log('  - WANDB_API_KEY in .env (for code generation)');
   console.log('  - DAYTONA_API_KEY in .env (for code validation)\n');
 }
