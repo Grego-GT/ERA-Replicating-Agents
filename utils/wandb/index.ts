@@ -100,12 +100,12 @@ export interface ChatWithHistoryResponse {
  * @returns Config object with apiKey, project, and inferenceUrl
  */
 function getWandbConfig(): WandbConfig {
-  const apiKey = Deno.env.get('WANDB_API_KEY');
+  const apiKey = Deno.env.get('INFERENCE_API_KEY') || Deno.env.get('WANDB_API_KEY');
   const project = Deno.env.get('WANDB_PROJECT');
   const inferenceUrl = Deno.env.get('INFERENCE_URL') || 'https://api.inference.wandb.ai/v1/chat/completions';
   
   if (!apiKey) {
-    throw new Error('WANDB_API_KEY not found in environment');
+    throw new Error('INFERENCE_API_KEY or WANDB_API_KEY not found in environment');
   }
   
   return { apiKey, project, inferenceUrl };
