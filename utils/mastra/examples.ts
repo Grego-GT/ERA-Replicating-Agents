@@ -13,27 +13,33 @@ export const MASTRA_NODE_UTIL = `
 // Mastra Agent Framework Utility - requires npm install @mastra/core
 const { Mastra, Agent, Workflow } = require('@mastra/core');
 
-// Initialize Mastra instance
+// Initialize Mastra instance with Groq
 function createMastra(config = {}) {
+  // Mastra configured to use Groq (fast and cost-effective)
   return new Mastra({
-    // Configuration options
+    llmProviders: {
+      groq: {
+        apiKey: process.env.GROQ_API_KEY
+      }
+    },
     ...config
   });
 }
 
 // Create an AI agent with memory and tool calling
-async function createAgent(options: {
-  name: string;
-  model?: string;
-  instructions: string;
-  tools?: any[];
-  memory?: boolean;
-}) {
+async function createAgent(options) {
   const mastra = createMastra();
+  
+  // Get model from options or default to Groq Llama 3.3
+  // Format: provider/model (e.g., 'groq/llama-3.3-70b-versatile')
+  let modelName = options.model || 'groq/llama-3.3-70b-versatile';
+  
+  // If model doesn't have provider prefix, add groq/
+  const model = modelName.includes('/') ? modelName : 'groq/' + modelName;
   
   const agent = new Agent({
     name: options.name,
-    model: options.model || 'gpt-4',
+    model: model,
     instructions: options.instructions,
     tools: options.tools || [],
     enableMemory: options.memory !== false
@@ -43,16 +49,13 @@ async function createAgent(options: {
 }
 
 // Execute agent with a user message
-async function executeAgent(agent: any, message: string, context = {}) {
+async function executeAgent(agent, message, context = {}) {
   const response = await agent.generate(message, context);
   return response;
 }
 
 // Create a workflow with steps
-function createWorkflow(options: {
-  name: string;
-  steps: Array<{ id: string; execute: (input: any) => Promise<any> }>;
-}) {
+function createWorkflow(options) {
   return new Workflow({
     name: options.name,
     steps: options.steps
@@ -60,7 +63,7 @@ function createWorkflow(options: {
 }
 
 // Execute workflow
-async function executeWorkflow(workflow: any, input: any) {
+async function executeWorkflow(workflow, input) {
   const result = await workflow.execute(input);
   return result;
 }
@@ -80,6 +83,39 @@ export const MASTRA_API_DOCS = `
 # Mastra Agent Framework Utility
 
 Mastra is a TypeScript agent framework for building AI applications with agents, workflows, RAG, and evals.
+
+## ⚠️ Important Requirements
+
+1. **Groq API**: Mastra uses Groq for fast, cost-effective inference
+2. **Environment Variables**: Requires \`GROQ_API_KEY\` in your .env file
+3. **Model Format**: Use format \`groq/model-name\` (e.g., \`groq/llama-3.3-70b-versatile\`)
+4. **Node.js Only**: This framework requires Node.js and cannot run in Deno
+5. **Default Model**: Llama 3.3 70B Versatile (fast and capable)
+
+## 🚨 CRITICAL: Model Naming
+
+**Always use the format \`groq/model-name\`** when creating agents:
+
+✅ CORRECT:
+\`\`\`javascript
+model: 'groq/llama-3.3-70b-versatile'     // Default, recommended
+model: 'groq/llama-3.1-8b-instant'        // Faster, smaller model
+\`\`\`
+
+❌ WRONG (will fail):
+\`\`\`javascript
+model: 'llama-3.3-70b-versatile'     // Missing groq/ prefix!
+model: 'gpt-4'                        // Wrong provider!
+\`\`\`
+
+**Why?** Mastra needs the provider prefix (\`groq/\`) to route requests correctly.
+
+## Configuration
+
+Mastra requires Groq API key:
+- API Key: \`process.env.GROQ_API_KEY\` (required)
+- Default Model: \`groq/llama-3.3-70b-versatile\`
+- Get your key: https://console.groq.com/keys
 
 ## Pre-loaded Functions
 
@@ -102,7 +138,10 @@ Create an AI agent with memory and tool calling capabilities.
 **Parameters:**
 - \`options\` (object):
   - \`name\` (string): Agent name/identifier
-  - \`model\` (string): LLM model (default: 'gpt-4')
+  - \`model\` (string, optional): Groq model name **with \`groq/\` prefix**
+    - **CRITICAL**: Must use format \`groq/model-name\`
+    - Examples: \`groq/llama-3.3-70b-versatile\`, \`groq/llama-3.1-8b-instant\`
+    - Defaults to \`groq/llama-3.3-70b-versatile\` if not specified
   - \`instructions\` (string): System instructions for the agent
   - \`tools\` (array, optional): Functions the agent can call
   - \`memory\` (boolean, optional): Enable agent memory (default: true)
@@ -110,14 +149,16 @@ Create an AI agent with memory and tool calling capabilities.
 **Returns:** Promise<{ mastra: Mastra, agent: Agent }>
 
 **Example:**
-\`\`\`typescript
+\`\`\`javascript
 const { mastra, agent } = await createAgent({
   name: 'assistant',
-  model: 'gpt-4',
+  model: 'groq/llama-3.3-70b-versatile',  // ⚠️ MUST include groq/ prefix!
   instructions: 'You are a helpful coding assistant',
   memory: true
 });
 \`\`\`
+
+**⚠️ IMPORTANT**: Mastra requires the \`groq/\` prefix to route requests to Groq.
 
 ### executeAgent(agent, message, context)
 Execute an agent with a user message.
@@ -175,10 +216,10 @@ console.log(result);
 ## Environment Variables Required
 
 \`\`\`env
-OPENAI_API_KEY=sk-your_openai_key_here
-# Or other model provider keys (Anthropic, Google, etc.)
-# ANTHROPIC_API_KEY=your_anthropic_key_here
+GROQ_API_KEY=gsk_your_groq_key_here
 \`\`\`
+
+Get your API key from: https://console.groq.com/keys
 
 ## Usage Examples
 
@@ -186,7 +227,7 @@ OPENAI_API_KEY=sk-your_openai_key_here
 \`\`\`typescript
 const { mastra, agent } = await createAgent({
   name: 'helper',
-  model: 'gpt-4',
+  model: 'groq/llama-3.3-70b-versatile',
   instructions: 'You are a helpful assistant that answers questions concisely'
 });
 
@@ -198,7 +239,7 @@ console.log('Agent:', response);
 \`\`\`typescript
 const { mastra, agent } = await createAgent({
   name: 'chatbot',
-  model: 'gpt-4',
+  model: 'groq/llama-3.3-70b-versatile',
   instructions: 'You are a friendly chatbot. Remember context from previous messages.',
   memory: true
 });
@@ -232,7 +273,7 @@ const weatherTool = {
 
 const { mastra, agent } = await createAgent({
   name: 'weather-agent',
-  model: 'gpt-4',
+  model: 'groq/llama-3.3-70b-versatile',
   instructions: 'You help users check the weather. Use the getWeather tool when needed.',
   tools: [weatherTool]
 });
@@ -273,7 +314,7 @@ console.log(result);
 \`\`\`typescript
 const { mastra, agent } = await createAgent({
   name: 'classifier',
-  model: 'gpt-4',
+  model: 'groq/llama-3.3-70b-versatile',
   instructions: 'Classify user intent as: question, command, or statement'
 });
 
@@ -311,13 +352,13 @@ console.log(result);
 // Create specialized agents
 const { agent: researcher } = await createAgent({
   name: 'researcher',
-  model: 'gpt-4',
+  model: 'groq/llama-3.3-70b-versatile',
   instructions: 'You research topics and provide detailed information'
 });
 
 const { agent: summarizer } = await createAgent({
   name: 'summarizer',
-  model: 'gpt-4',
+  model: 'groq/llama-3.3-70b-versatile',
   instructions: 'You summarize long text into concise bullet points'
 });
 
@@ -332,12 +373,12 @@ console.log('Summary:', summary);
 
 ## Important Notes
 
-1. **Model Routing**: Mastra uses Vercel AI SDK for unified LLM access (OpenAI, Anthropic, Google, etc.)
+1. **Groq Provider**: Fast, cost-effective inference with Llama 3.3 models via Groq
 2. **Memory**: Agents with memory enabled persist conversation context automatically
 3. **Tools**: Tools are functions agents can call autonomously based on context
 4. **Workflows**: Use workflows for deterministic, repeatable LLM chains
 5. **Error Handling**: Always wrap agent/workflow execution in try-catch
-6. **API Keys**: Set provider API keys in environment variables
+6. **API Keys**: Set GROQ_API_KEY in environment variables
 
 ## Complete Example
 
@@ -357,7 +398,7 @@ ${MASTRA_NODE_UTIL}
     
     const { mastra, agent } = await createAgent({
       name: 'support-agent',
-      model: 'gpt-4',
+      model: 'groq/llama-3.3-70b-versatile',
       instructions: 'You are a helpful customer support agent. Be friendly and professional.',
       memory: true
     });
@@ -378,7 +419,8 @@ ${MASTRA_NODE_UTIL}
     console.log('\\n✅ Mastra agent demo complete!');
   } catch (error) {
     console.error('❌ Error:', error.message);
-    console.error('\\n💡 Make sure OPENAI_API_KEY is set in environment');
+    console.error('\\n💡 Make sure GROQ_API_KEY is set in your .env file');
+    console.error('💡 Get your key from: https://console.groq.com/keys');
   }
 })();
 \`\`\`
@@ -410,7 +452,7 @@ ${MASTRA_NODE_UTIL}
     console.log('=' .repeat(40));
     const { mastra, agent } = await createAgent({
       name: 'coding-assistant',
-      model: 'gpt-4',
+      model: 'groq/llama-3.3-70b-versatile',
       instructions: 'You are a helpful coding assistant. Provide concise, practical answers.'
     });
     
@@ -423,7 +465,7 @@ ${MASTRA_NODE_UTIL}
     console.log('=' .repeat(40));
     const { agent: memoryAgent } = await createAgent({
       name: 'chatbot',
-      model: 'gpt-4',
+      model: 'groq/llama-3.3-70b-versatile',
       instructions: 'You are a friendly chatbot. Remember context.',
       memory: true
     });
@@ -464,8 +506,9 @@ ${MASTRA_NODE_UTIL}
   } catch (error) {
     console.error('❌ Error:', error.message);
     console.error('\\n💡 Troubleshooting:');
-    console.error('   1. Check OPENAI_API_KEY is set');
-    console.error('   2. Visit https://docs.mastra.ai/ for documentation');
+    console.error('   1. Check GROQ_API_KEY is set in your .env file');
+    console.error('   2. Get your key from: https://console.groq.com/keys');
+    console.error('   3. Visit https://docs.mastra.ai/ for documentation');
   }
 })();
 `;

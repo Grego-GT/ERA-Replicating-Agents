@@ -1,62 +1,57 @@
 # Mastra Agent Framework Utility 🤖
 
-TypeScript agent framework utility for ERA agents using [Mastra](https://docs.mastra.ai/).
+TypeScript agent framework utility for ERA agents using [Mastra](https://mastra.ai).
 
 ## Overview
 
-Mastra is an open-source TypeScript agent framework that provides primitives for building AI applications: agents with memory and tool calling, deterministic workflows, RAG, integrations, and evals.
+Mastra is a modern TypeScript framework for building AI applications with agents, workflows, RAG (Retrieval Augmented Generation), and evaluation tools. Perfect for creating sophisticated AI systems with memory, tool calling, and multi-step processes.
 
 **Key Features:**
-- 🤖 **AI Agents**: Create agents with memory and tool/function calling
-- 🔄 **Workflows**: Deterministic LLM chains with branching and control flow
-- 🧠 **Memory**: Persist and retrieve agent context (recency, semantic similarity, threads)
-- 🛠️ **Tools**: Give agents functions they can call autonomously
-- 📊 **Evals**: Automated evaluation metrics for LLM outputs
-- 🔍 **RAG**: Retrieval-augmented generation with vector stores
-- 🎮 **Dev Playground**: Local chat interface for agent development
-- 🌐 **Model Routing**: Uses Vercel AI SDK for unified LLM provider access
+- 🤖 **AI Agents**: Create intelligent agents with memory and tool calling
+- 🔄 **Workflows**: Build multi-step AI workflows
+- 📚 **RAG Support**: Retrieval Augmented Generation built-in
+- 🧪 **Evals**: Test and evaluate your AI systems
+- 🛠️ **Tool Calling**: Extend agents with custom tools
+- 💾 **Memory**: Persistent conversation memory
+- 🔌 **Integrations**: Works with OpenAI, Anthropic, and more
 
 ## Prerequisites
 
 Mastra requires:
-- **Node.js** (TypeScript framework)
-- **LLM API Key** - OpenAI, Anthropic, or Google Gemini
+1. Node.js environment (not compatible with Deno)
+2. OpenAI API key
 
 ## Installation
 
 Add to your `.env` file:
 
 ```env
-OPENAI_API_KEY=sk-your_openai_key_here
-
-# Or use other providers:
-# ANTHROPIC_API_KEY=your_anthropic_key_here
-# GOOGLE_API_KEY=your_google_key_here
+# OpenAI API key (required)
+OPENAI_API_KEY=sk-your-openai-key-here
 ```
+
+Get your API key from: https://platform.openai.com/api-keys
 
 ## Quick Start
 
 ### CLI Quick Start
 
 ```bash
-# Interactive mode - choose "Multi-Agent System" template
+# Interactive mode - create a Mastra agent
 deno task cli
 
-# Or direct command
-deno task start:mastra
+# Or use existing test
+deno task test:mastra
 ```
 
 ### Testing the Utility
 
 ```bash
-# Test the utility structure
-deno task test:mastra
+# Run tests (shows configuration examples)
+deno run --allow-read --allow-env --allow-net utils/mastra/test.ts
 
-# View API documentation
-deno run --allow-read utils/mastra/examples.ts
-
-# Test Deno index (shows configuration)
-deno task test:mastra-index
+# Or directly
+deno run --allow-read --allow-env --allow-net utils/mastra/index.ts
 ```
 
 ## Core Functions
@@ -66,7 +61,9 @@ deno task test:mastra-index
 Initialize a Mastra instance.
 
 ```typescript
-const mastra = createMastra();
+const mastra = createMastra({
+  // Configuration options
+});
 ```
 
 ### `createAgent(options)`
@@ -75,40 +72,64 @@ Create an AI agent with memory and tool calling.
 
 ```typescript
 const { mastra, agent } = await createAgent({
-  name: 'assistant',
+  name: 'research-assistant',
   model: 'gpt-4',
-  instructions: 'You are a helpful coding assistant',
+  instructions: 'You are a helpful research assistant',
   memory: true,
-  tools: [] // optional function tools
+  tools: []  // Optional: add custom tools
 });
 ```
 
-**Options:**
-- `name` (string) - Agent identifier
-- `model` (string) - LLM model (default: 'gpt-4')
-- `instructions` (string) - System prompt/instructions
-- `tools` (array) - Functions the agent can call
-- `memory` (boolean) - Enable conversation memory (default: true)
+**Parameters:**
+- `name` (string) - Agent name
+- `model` (string, optional) - Model to use (default: 'gpt-4')
+  - OpenAI: `'gpt-4'`, `'gpt-4-turbo'`, `'gpt-3.5-turbo'`
+  - Anthropic: `'claude-3-5-sonnet-latest'`, `'claude-3-opus-latest'`
+- `instructions` (string) - System instructions for the agent
+- `tools` (array, optional) - Array of tool definitions
+- `memory` (boolean, optional) - Enable conversation memory (default: true)
 
 ### `executeAgent(agent, message, context)`
 
 Execute an agent with a user message.
 
 ```typescript
-const response = await executeAgent(agent, 'Help me debug this code');
-console.log(response);
+const response = await executeAgent(
+  agent,
+  'What is the capital of France?',
+  { userId: 'user123' }
+);
+
+console.log(response.text);
 ```
+
+**Parameters:**
+- `agent` - The agent instance
+- `message` (string) - User's message
+- `context` (object, optional) - Additional context for the agent
 
 ### `createWorkflow(options)`
 
-Create a deterministic workflow with steps.
+Create a multi-step workflow.
 
 ```typescript
 const workflow = createWorkflow({
-  name: 'data-pipeline',
+  name: 'data-processing',
   steps: [
-    { id: 'fetch', execute: async (input) => { /* fetch */ } },
-    { id: 'process', execute: async (input) => { /* process */ } }
+    {
+      id: 'fetch',
+      execute: async (input) => {
+        // Fetch data
+        return fetchedData;
+      }
+    },
+    {
+      id: 'process',
+      execute: async (input) => {
+        // Process data
+        return processedData;
+      }
+    }
   ]
 });
 ```
@@ -118,7 +139,10 @@ const workflow = createWorkflow({
 Execute a workflow with input data.
 
 ```typescript
-const result = await executeWorkflow(workflow, { query: 'user data' });
+const result = await executeWorkflow(workflow, {
+  source: 'api',
+  query: 'latest data'
+});
 ```
 
 ## Usage Examples
@@ -126,161 +150,172 @@ const result = await executeWorkflow(workflow, { query: 'user data' });
 ### Example 1: Simple Agent
 
 ```typescript
-const { mastra, agent } = await createAgent({
-  name: 'helper',
-  model: 'gpt-4',
-  instructions: 'You answer questions concisely'
-});
-
-const response = await executeAgent(agent, 'What is TypeScript?');
-console.log(response);
+(async () => {
+  // Create agent
+  const { mastra, agent } = await createAgent({
+    name: 'assistant',
+    model: 'gpt-4',
+    instructions: 'You are a helpful assistant'
+  });
+  
+  // Execute
+  const response = await executeAgent(
+    agent,
+    'Explain quantum computing in simple terms'
+  );
+  
+  console.log(response.text);
+})();
 ```
 
 ### Example 2: Agent with Memory
 
 ```typescript
-const { mastra, agent } = await createAgent({
-  name: 'chatbot',
-  model: 'gpt-4',
-  instructions: 'You are a friendly chatbot. Remember context.',
-  memory: true
-});
-
-// First message
-await executeAgent(agent, 'My name is Alice');
-
-// Agent remembers!
-const response = await executeAgent(agent, 'What is my name?');
-console.log(response); // "Your name is Alice"
+(async () => {
+  const { mastra, agent } = await createAgent({
+    name: 'conversation-bot',
+    model: 'gpt-4',
+    instructions: 'You are a friendly chatbot',
+    memory: true
+  });
+  
+  // First message
+  const response1 = await executeAgent(
+    agent,
+    'My name is Alice',
+    { userId: 'user123' }
+  );
+  console.log(response1.text);
+  
+  // Second message - agent remembers
+  const response2 = await executeAgent(
+    agent,
+    'What is my name?',
+    { userId: 'user123' }
+  );
+  console.log(response2.text);  // "Your name is Alice"
+})();
 ```
 
-### Example 3: Agent with Tools
+### Example 3: Agent with Custom Tools
 
 ```typescript
-// Define a tool
-const weatherTool = {
-  name: 'getWeather',
-  description: 'Get current weather for a location',
-  parameters: {
-    type: 'object',
-    properties: {
-      location: { type: 'string', description: 'City name' }
-    },
-    required: ['location']
-  },
-  execute: async (params) => {
-    return `Weather in ${params.location}: Sunny, 72°F`;
-  }
-};
-
-const { mastra, agent } = await createAgent({
-  name: 'weather-agent',
-  model: 'gpt-4',
-  instructions: 'Help users check weather. Use getWeather tool when needed.',
-  tools: [weatherTool]
-});
-
-const response = await executeAgent(
-  agent,
-  'What\\'s the weather in San Francisco?'
-);
-console.log(response); // Agent calls weatherTool autonomously
-```
-
-### Example 4: Multi-Agent System
-
-```typescript
-// Create specialized agents
-const { agent: researcher } = await createAgent({
-  name: 'researcher',
-  model: 'gpt-4',
-  instructions: 'Research topics and provide detailed information'
-});
-
-const { agent: summarizer } = await createAgent({
-  name: 'summarizer',
-  model: 'gpt-4',
-  instructions: 'Summarize long text into concise bullet points'
-});
-
-// Use them in sequence
-const topic = 'quantum computing';
-const research = await executeAgent(researcher, `Research: ${topic}`);
-const summary = await executeAgent(summarizer, `Summarize: ${research}`);
-
-console.log('Research:', research);
-console.log('Summary:', summary);
-```
-
-### Example 5: Workflow with Steps
-
-```typescript
-const workflow = createWorkflow({
-  name: 'greet-and-analyze',
-  steps: [
-    {
-      id: 'greet',
-      execute: async (input) => ({
-        ...input,
-        greeting: `Hello, ${input.name}!`
-      })
-    },
-    {
-      id: 'analyze',
-      execute: async (input) => ({
-        ...input,
-        analysis: `Name length: ${input.name.length} characters`
-      })
-    }
-  ]
-});
-
-const result = await executeWorkflow(workflow, { name: 'Alice' });
-console.log(result);
-// { name: 'Alice', greeting: 'Hello, Alice!', analysis: '...' }
-```
-
-### Example 6: LLM Workflow with Classification
-
-```typescript
-const { mastra, agent } = await createAgent({
-  name: 'classifier',
-  model: 'gpt-4',
-  instructions: 'Classify user intent as: question, command, or statement'
-});
-
-const workflow = createWorkflow({
-  name: 'intent-handler',
-  steps: [
-    {
-      id: 'classify',
-      execute: async (input) => {
-        const intent = await executeAgent(
-          agent,
-          `Classify: "${input.message}"`
-        );
-        return { ...input, intent };
+(async () => {
+  // Define custom tools
+  const weatherTool = {
+    name: 'get_weather',
+    description: 'Get current weather for a location',
+    parameters: {
+      type: 'object',
+      properties: {
+        location: { type: 'string' }
       }
     },
-    {
-      id: 'route',
-      execute: async (input) => {
-        if (input.intent.includes('question')) {
-          return { ...input, response: 'Routing to Q&A' };
-        } else if (input.intent.includes('command')) {
-          return { ...input, response: 'Executing command' };
-        } else {
-          return { ...input, response: 'Acknowledged' };
+    execute: async ({ location }) => {
+      // Fetch weather data
+      return { temp: 72, condition: 'sunny' };
+    }
+  };
+  
+  const { mastra, agent } = await createAgent({
+    name: 'weather-assistant',
+    model: 'gpt-4',
+    instructions: 'Help users with weather information',
+    tools: [weatherTool]
+  });
+  
+  const response = await executeAgent(
+    agent,
+    'What is the weather in San Francisco?'
+  );
+  
+  console.log(response.text);
+})();
+```
+
+### Example 4: Multi-Step Workflow
+
+```typescript
+(async () => {
+  const workflow = createWorkflow({
+    name: 'research-pipeline',
+    steps: [
+      {
+        id: 'search',
+        execute: async (input) => {
+          // Search for information
+          return { results: [...] };
+        }
+      },
+      {
+        id: 'analyze',
+        execute: async (input) => {
+          // Analyze results
+          return { analysis: '...' };
+        }
+      },
+      {
+        id: 'summarize',
+        execute: async (input) => {
+          // Summarize findings
+          return { summary: '...' };
         }
       }
-    }
-  ]
-});
+    ]
+  });
+  
+  const result = await executeWorkflow(workflow, {
+    query: 'AI trends 2025'
+  });
+  
+  console.log(result.summary);
+})();
+```
 
-const result = await executeWorkflow(workflow, {
-  message: 'What is AI?'
-});
-console.log(result);
+### Example 5: Using Claude Model
+
+```typescript
+(async () => {
+  const { mastra, agent } = await createAgent({
+    name: 'code-reviewer',
+    model: 'claude-3-5-sonnet-latest',
+    instructions: 'You are an expert code reviewer'
+  });
+  
+  const response = await executeAgent(
+    agent,
+    'Review this code: function add(a, b) { return a + b; }'
+  );
+  
+  console.log(response.text);
+})();
+```
+
+### Example 6: RAG (Retrieval Augmented Generation)
+
+```typescript
+(async () => {
+  const { mastra, agent } = await createAgent({
+    name: 'documentation-assistant',
+    model: 'gpt-4',
+    instructions: 'Answer questions using the provided documentation',
+    memory: true
+  });
+  
+  // Add knowledge base
+  await mastra.addKnowledge({
+    source: 'documentation',
+    content: 'Your documentation content here...'
+  });
+  
+  // Query with RAG
+  const response = await executeAgent(
+    agent,
+    'How do I configure authentication?'
+  );
+  
+  console.log(response.text);
+})();
 ```
 
 ## Integration with ERA
@@ -288,48 +323,25 @@ console.log(result);
 This utility is automatically registered in the ERA system and can be injected into generated agents:
 
 ```bash
-# The AI will use Mastra when appropriate
-deno task cli:create research-bot --prompt "Create a research agent with memory that can cite sources"
+# The AI will automatically use Mastra when appropriate
+deno task cli:create smart-agent --prompt "Create an AI agent with memory that can answer questions"
 ```
 
 The FBI Director will:
-1. Detect the need for agent framework capabilities
+1. Detect keywords like "agent", "workflow", "memory", "tools"
 2. Inject the Mastra utility code
 3. Install NPM dependencies (`@mastra/core`)
-4. Generate code using pre-loaded functions
+4. Generate code using Mastra functions
 
-## Advanced Features
+## Advanced Usage
 
-### Custom Tool Definition
-
-```typescript
-const calculatorTool = {
-  name: 'calculate',
-  description: 'Perform mathematical calculations',
-  parameters: {
-    type: 'object',
-    properties: {
-      expression: { type: 'string', description: 'Math expression' }
-    }
-  },
-  execute: async (params) => {
-    try {
-      return eval(params.expression);
-    } catch (error) {
-      return 'Invalid expression';
-    }
-  }
-};
-```
-
-### Agent with Multiple Tools
+### Custom Configuration
 
 ```typescript
-const { agent } = await createAgent({
-  name: 'multi-tool-agent',
-  model: 'gpt-4',
-  instructions: 'You help with weather and calculations',
-  tools: [weatherTool, calculatorTool]
+const mastra = createMastra({
+  // Custom configuration
+  logLevel: 'debug',
+  timeout: 30000
 });
 ```
 
@@ -337,89 +349,101 @@ const { agent } = await createAgent({
 
 ```typescript
 try {
-  const { agent } = await createAgent({
-    name: 'test-agent',
+  const { mastra, agent } = await createAgent({
+    name: 'assistant',
     model: 'gpt-4',
-    instructions: 'Test agent'
+    instructions: 'You are helpful'
   });
   
-  const response = await executeAgent(agent, 'Hello');
-  console.log(response);
+  const response = await executeAgent(agent, 'Hello!');
+  console.log(response.text);
 } catch (error) {
   console.error('Agent failed:', error.message);
+  // Handle error
 }
 ```
 
-## Key Concepts
+### Combining Agents and Workflows
 
-### Agents vs Workflows
+```typescript
+(async () => {
+  // Create specialized agents
+  const { agent: researcher } = await createAgent({
+    name: 'researcher',
+    instructions: 'Research topics thoroughly'
+  });
+  
+  const { agent: writer } = await createAgent({
+    name: 'writer',
+    instructions: 'Write clear summaries'
+  });
+  
+  // Combine in a workflow
+  const workflow = createWorkflow({
+    name: 'research-and-write',
+    steps: [
+      {
+        id: 'research',
+        execute: async (input) => {
+          return await executeAgent(researcher, input.topic);
+        }
+      },
+      {
+        id: 'write',
+        execute: async (input) => {
+          return await executeAgent(writer, `Summarize: ${input.text}`);
+        }
+      }
+    ]
+  });
+  
+  const result = await executeWorkflow(workflow, {
+    topic: 'Latest AI developments'
+  });
+  
+  console.log(result);
+})();
+```
 
-- **Agents**: Autonomous AI entities with memory and tool calling
-  - Use when you need adaptive, context-aware responses
-  - Can call functions based on conversation context
-  - Maintain memory across interactions
+## Important Notes
 
-- **Workflows**: Deterministic step-by-step processes
-  - Use for repeatable, predictable LLM chains
-  - Good for data pipelines and structured tasks
-  - Can include branching logic
-
-### Memory
-
-Agents with `memory: true` automatically:
-- Store conversation history
-- Retrieve relevant context
-- Maintain thread continuity
-- Support semantic similarity search
-
-### Tools
-
-Tools are functions agents can autonomously call:
-- Define with JSON schema
-- Agent decides when to use them
-- Results are integrated into responses
-- Supports multiple tools per agent
-
-## Comparison with Other Frameworks
-
-| Feature | Mastra | LangChain | CrewAI |
-|---------|--------|-----------|--------|
-| TypeScript-first | ✅ | ❌ | ❌ |
-| Agent Memory | ✅ | ✅ | ✅ |
-| Workflows | ✅ | ✅ | ✅ |
-| Dev Playground | ✅ | ❌ | ❌ |
-| RAG Support | ✅ | ✅ | ❌ |
-| Evals | ✅ | ❌ | ❌ |
+1. **Node.js Only**: Mastra requires Node.js (not compatible with Deno)
+2. **API Keys Required**: Must have API keys for your chosen LLM provider
+3. **Memory Persistence**: Memory is persisted across conversations
+4. **Tool Calling**: Tools must be properly defined with schemas
+5. **Error Handling**: Wrap calls in try-catch for API/network errors
 
 ## Limitations
 
-- **Node.js Only**: Mastra requires Node.js runtime (not Deno compatible)
-- **API Costs**: LLM API calls have usage-based pricing
-- **Memory Storage**: Default in-memory storage (consider external DB for production)
+- **Node.js Requirement**: Cannot run in Deno or browser environments
+- **API Costs**: LLM API usage incurs costs
+- **Rate Limits**: Respect provider rate limits
+- **Memory Storage**: May require external storage for large-scale applications
 
 ## Resources
 
-- [Mastra Documentation](https://docs.mastra.ai/)
+- [Mastra Website](https://mastra.ai)
+- [Mastra Documentation](https://docs.mastra.ai)
 - [GitHub Repository](https://github.com/mastra-ai/mastra)
-- [Vercel AI SDK](https://sdk.vercel.ai/docs/introduction)
+- [Examples](https://docs.mastra.ai/examples)
 
 ## Files
 
 - `index.ts` - Deno placeholder (documentation only)
-- `examples.ts` - Node.js injection code for agents
+- `examples.ts` - Node.js injection code for generated agents
+- `test.ts` - Test runner (imports from index.ts)
 - `README.md` - This file
 
 ## Next Steps
 
-1. Set up environment variables in `.env`
-2. Try the quick start: `deno task start:mastra`
-3. Create custom agents with `deno task cli`
-4. Explore multi-agent patterns
-5. Learn more at https://docs.mastra.ai/
+1. Set up LLM API keys in `.env`
+2. Test the utility: `deno task test:mastra`
+3. Create Mastra agents: `deno task cli`
+4. Explore examples at https://docs.mastra.ai/examples
 
 ---
 
-**Questions?** Check the [API documentation](./examples.ts) or run:
-```bash
-deno run --allow-read utils/mastra/examples.ts
-```
+**Questions?** Check the [API documentation](./examples.ts) or visit:
+- https://docs.mastra.ai/
+- https://github.com/mastra-ai/mastra
+

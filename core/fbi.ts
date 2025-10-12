@@ -377,6 +377,16 @@ async function agentExecuteCode(
       envVars.TAVILY_API_KEY = Deno.env.get('TAVILY_API_KEY')!;
     }
     
+    // OpenAI (for Mastra and other utilities)
+    if (Deno.env.get('OPENAI_API_KEY')) {
+      envVars.OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY')!;
+    }
+    
+    // Groq (for Mastra with fast inference)
+    if (Deno.env.get('GROQ_API_KEY')) {
+      envVars.GROQ_API_KEY = Deno.env.get('GROQ_API_KEY')!;
+    }
+    
     // Browserbase (browser automation)
     if (Deno.env.get('BROWSERBASE_API_KEY')) {
       envVars.BROWSERBASE_API_KEY = Deno.env.get('BROWSERBASE_API_KEY')!;

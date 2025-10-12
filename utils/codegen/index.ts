@@ -162,9 +162,40 @@ You MUST wrap ALL code in <code></code> tags like this:
 
 DO NOT use markdown code blocks like \`\`\`typescript. Use <code></code> tags ONLY!
 
+🚨🚨🚨 CRITICAL RULE - READ THIS FIRST! 🚨🚨🚨
+
+NEVER write code like this:
+❌ const { createAgent } = require('./mastra-utils');
+❌ const { tavilySearch } = require('@tavily/core');
+❌ const { tavilySearch } = require('./tavily-utils');
+❌ execSync('npm install @mastra/core @tavily/core');
+❌ import { createAgent } from './mastra-utils';
+
+The utility functions are ALREADY IN SCOPE. Just call them like built-in functions:
+✅ const results = await tavilySearch('my query');
+✅ const { agent } = await createAgent({ name: 'foo', model: 'groq/llama-3.3-70b-versatile', instructions: '...' });
+
 ${utilityDocs}
 
-NOTE: The utilities above are PRE-LOADED and available in your environment. You can call them directly without installing or defining them!
+🚨 CRITICAL: UTILITIES ARE PRE-LOADED!
+The functions listed above (like tavilySearch, wandbChat, createMastra, createAgent, etc.) are ALREADY AVAILABLE.
+❌ DO NOT install packages for these utilities (no npm install @tavily/core, @mastra/core, etc.)
+❌ DO NOT import or require these utilities (no require('./mastra-utils'), no require('@tavily/core'))
+❌ DO NOT create separate utility files or modules
+✅ JUST CALL THEM DIRECTLY - they're already defined and ready to use in your code scope!
+
+Example:
+<code>
+// ✅ CORRECT - Just use it directly
+const results = await tavilySearch('my query', { maxResults: 5 });
+console.log(results);
+</code>
+
+<code>
+// ❌ WRONG - Don't do this!
+const { tavilySearch } = require('@tavily/core');  // NO!
+execSync('npm install @tavily/core');              // NO!
+</code>
 
 ⚠️ IMPORTANT: Use utilities ONLY when the task explicitly requires them!
 - For SIMPLE tasks (like FizzBuzz, factorial, string reversal), write PLAIN JavaScript code

@@ -80,35 +80,87 @@ export async function tavilyQuickSearch(query: string, apiKey?: string): Promise
 }
 
 // ============================================================================
+// Test runner function (can be imported by test.ts)
+// ============================================================================
+
+/**
+ * Run comprehensive tests for Tavily search functionality
+ */
+export async function runTavilyTest(): Promise<void> {
+  console.log('🚀 Starting Tavily Search Tests...\n');
+  
+  try {
+    // Test 1: Basic search with answer
+    console.log('📝 Test 1: Basic search with AI-generated answer');
+    const query1 = 'What is Deno?';
+    console.log(`Query: "${query1}"\n`);
+    
+    const result1 = await tavilySearch(query1, {
+      searchDepth: 'basic',
+      maxResults: 3,
+      includeAnswer: true
+    });
+    
+    console.log('🤖 AI Answer:');
+    console.log(result1.answer);
+    console.log('\n📚 Top 3 Sources:');
+    
+    result1.results.forEach((r, i) => {
+      console.log(`\n${i + 1}. ${r.title} (relevance: ${r.score})`);
+      console.log(`   🔗 ${r.url}`);
+      console.log(`   📄 ${r.content.substring(0, 100)}...`);
+    });
+    console.log('');
+    
+    // Test 2: Quick search (just answer)
+    console.log('📝 Test 2: Quick search (answer only)');
+    const query2 = 'Who won the Nobel Prize in Physics in 2023?';
+    console.log(`Query: "${query2}"\n`);
+    
+    const answer = await tavilyQuickSearch(query2);
+    console.log('🤖 Quick Answer:', answer);
+    console.log('');
+    
+    // Test 3: Advanced search with more results
+    console.log('📝 Test 3: Advanced search with domain filtering');
+    const query3 = 'latest AI breakthroughs';
+    console.log(`Query: "${query3}"\n`);
+    
+    const result3 = await tavilySearch(query3, {
+      searchDepth: 'advanced',
+      maxResults: 5,
+      includeAnswer: true,
+      // Example of domain filtering (optional)
+      // includeDomains: ['arxiv.org', 'openai.com', 'anthropic.com']
+    });
+    
+    console.log('🤖 AI Answer:');
+    console.log(result3.answer);
+    console.log(`\n📊 Found ${result3.results.length} results`);
+    console.log('Top 3:');
+    result3.results.slice(0, 3).forEach((r, i) => {
+      console.log(`  ${i + 1}. ${r.title}`);
+      console.log(`     Score: ${r.score}, URL: ${r.url}`);
+    });
+    console.log('');
+    
+    console.log('✅ All Tavily search tests completed successfully!');
+    console.log('💡 Tavily is working correctly with proper Response handling\n');
+    
+  } catch (error) {
+    const err = error as Error;
+    console.error('❌ Tavily test failed:', err.message);
+    console.error('\n💡 Make sure TAVILY_API_KEY is set in .env');
+    console.error('   Get your API key at: https://tavily.com/');
+    throw error;
+  }
+}
+
+// ============================================================================
 // Test runner (if this file is executed directly)
 // ============================================================================
 
 if (import.meta.main) {
-  console.log('🔍 Testing Tavily Search (Deno)...\n');
-  
-  try {
-    const query = 'What is Deno?';
-    console.log(`Query: "${query}"\n`);
-    
-    const result = await tavilySearch(query, {
-      searchDepth: 'basic',
-      maxResults: 3,
-    });
-    
-    console.log('📝 Answer:');
-    console.log(result.answer);
-    console.log('\n📚 Top Sources:');
-    
-    result.results.forEach((r, i) => {
-      console.log(`\n${i + 1}. ${r.title} (score: ${r.score})`);
-      console.log(`   🔗 ${r.url}`);
-      console.log(`   📄 ${r.content.substring(0, 150)}...`);
-    });
-    
-    console.log('\n✅ Tavily search working!');
-  } catch (error) {
-    console.error('❌ Error:', (error as Error).message);
-    console.error('\n💡 Make sure TAVILY_API_KEY is set in .env');
-  }
+  await runTavilyTest();
 }
 

@@ -29,23 +29,72 @@ async function tavilySearch(query: string, options: {
   
   const tvly = tavily({ apiKey });
   
+  // Build search options with correct parameter names for Tavily SDK
+  // The Tavily SDK expects the query as first parameter, and options as second parameter
   const searchOptions: any = {
-    query,
-    searchDepth: options.searchDepth || 'basic',
-    maxResults: options.maxResults || 5,
-    includeAnswer: options.includeAnswer !== false, // default true
-    includeImages: options.includeImages || false,
+    search_depth: options.searchDepth || 'basic',  // SDK uses snake_case
+    max_results: options.maxResults || 5,           // SDK uses snake_case
+    include_answer: options.includeAnswer !== false, // SDK uses snake_case, default true
+    include_images: options.includeImages || false  // SDK uses snake_case
   };
   
-  if (options.includeDomains) {
-    searchOptions.includeDomains = options.includeDomains;
+  if (options.includeDomains && options.includeDomains.length > 0) {
+    searchOptions.include_domains = options.includeDomains;  // SDK uses snake_case
   }
-  if (options.excludeDomains) {
-    searchOptions.excludeDomains = options.excludeDomains;
+  if (options.excludeDomains && options.excludeDomains.length > 0) {
+    searchOptions.exclude_domains = options.excludeDomains;  // SDK uses snake_case
   }
   
-  const response = await tvly.search(searchOptions);
-  return response;
+  try {
+    // Tavily SDK: tvly.search(query_string, options_object)
+    // Use .catch() to handle any unhandled promise rejections from the SDK
+    let response = await tvly.search(query, searchOptions).catch(async (err) => {
+      // If the error is a Response object, try to parse it
+      if (err && typeof err === 'object' && typeof err.json === 'function') {
+        try {
+          const errorData = await err.json();
+          throw new Error(\`Tavily API error: \${JSON.stringify(errorData)}\`);
+        } catch (parseError) {
+          throw new Error(\`Tavily API error: Could not parse error response\`);
+        }
+      }
+      throw err;
+    });
+    
+    // If response is a Response object (fetch API), parse it
+    if (response && typeof response === 'object' && typeof response.json === 'function') {
+      try {
+        const data = await response.json();
+        response = data;
+      } catch (parseError) {
+        throw new Error('Failed to parse Tavily response as JSON');
+      }
+    }
+    
+    // Validate response has expected structure
+    if (!response || typeof response !== 'object') {
+      throw new Error('Invalid response from Tavily API');
+    }
+    
+    // Return parsed response
+    return response;
+  } catch (error) {
+    // Handle Response object errors
+    if (error && typeof error === 'object' && typeof error.json === 'function') {
+      try {
+        const errorData = await error.json();
+        throw new Error(\`Tavily API error: \${JSON.stringify(errorData)}\`);
+      } catch (parseError) {
+        throw new Error('Tavily API returned an error response that could not be parsed');
+      }
+    }
+    // If error has a message property, use it
+    if (error && typeof error === 'object' && 'message' in error) {
+      throw new Error(\`Tavily search failed: \${error.message}\`);
+    }
+    // Last resort: stringify the error
+    throw new Error(\`Tavily search failed: \${String(error)}\`);
+  }
 }
 
 // Quick search helper - returns just the answer text
@@ -156,8 +205,9 @@ const result = await tavilySearch("Python tutorials", {
 1. **API Key**: Always pass TAVILY_API_KEY via environment variable or options
 2. **Search Depth**: Use 'advanced' for more comprehensive results (uses more credits)
 3. **Rate Limits**: Be mindful of Tavily API rate limits and credits
-4. **Error Handling**: Wrap calls in try-catch for network/API errors
+4. **Error Handling**: Wrap calls in try-catch for network/API errors (the utility handles Response objects automatically)
 5. **Results**: The \`results\` array is ordered by relevance score (0-1)
+6. **Promise Handling**: Always await tavilySearch() calls - the function properly handles Response objects and parsing
 
 ## Complete Example
 \`\`\`typescript
