@@ -17,15 +17,21 @@ function broadcastUserCount() {
   const count = activeConnections.size;
   const message = JSON.stringify({ type: 'user_count', count });
   
+  console.log(`📢 Broadcasting user count: ${count} to ${activeConnections.size} connections`);
+  
+  let successCount = 0;
   activeConnections.forEach((socket) => {
     if (socket.readyState === WebSocket.OPEN) {
       try {
         socket.send(message);
+        successCount++;
       } catch (error) {
         console.error('Error broadcasting user count:', error);
       }
     }
   });
+  
+  console.log(`✅ Successfully sent to ${successCount}/${activeConnections.size} connections`);
 }
 
 const MIME_TYPES: Record<string, string> = {
@@ -96,11 +102,11 @@ async function serveFile(filePath: string): Promise<Response> {
 
 // Handle WebSocket connections for terminal
 function handleWebSocket(socket: WebSocket) {
-  console.log("🔌 WebSocket connected");
+  console.log("🔌 WebSocket connecting...");
   
   // Add to active connections
   activeConnections.add(socket);
-  broadcastUserCount();
+  console.log(`👥 Active connections: ${activeConnections.size}`);
   
   let currentProcess: Deno.ChildProcess | null = null;
   let processWriter: WritableStreamDefaultWriter<Uint8Array> | null = null;
@@ -109,9 +115,17 @@ function handleWebSocket(socket: WebSocket) {
   let sessionCwd = isProduction 
     ? join(Deno.cwd(), "..")  // /app in production
     : join(Deno.cwd(), "..");  // Parent directory in development
-
+  
+  // Wait for socket to open before sending messages
   socket.onopen = () => {
-    socket.send(JSON.stringify({ type: 'connected' }));
+    console.log("🔌 WebSocket fully open");
+    try {
+      socket.send(JSON.stringify({ type: 'connected' }));
+      // Broadcast user count to all connected clients
+      broadcastUserCount();
+    } catch (error) {
+      console.error('Error sending initial messages:', error);
+    }
   };
 
   socket.onmessage = async (event) => {

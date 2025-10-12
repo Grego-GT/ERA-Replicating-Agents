@@ -617,7 +617,10 @@
               const count = message.count;
               const plural = count === 1 ? 'user' : 'users';
               userCountText.textContent = `${count} ${plural} online`;
-              console.log(`👥 ${count} ${plural} online`);
+              console.log(`👥 Received user_count: ${count} ${plural} online`);
+              console.log(`👥 Updated display element:`, userCountText);
+            } else {
+              console.log('📨 Unknown message type:', message.type, message);
             }
           } catch (error) {
             console.error('Error parsing message:', error);
