@@ -417,8 +417,20 @@
         padding: 8px 16px;
         font-size: 11px;
         color: #888;
-        pointer-events: none;
+        pointer-events: auto;
         backdrop-filter: blur(4px);
+        cursor: pointer;
+        transition: opacity 0.2s;
+      }
+
+      #keyboard-hint:hover {
+        background: rgba(26, 26, 26, 0.95);
+        border-color: #444;
+      }
+
+      #keyboard-hint.hidden {
+        opacity: 0;
+        pointer-events: none;
       }
 
       #copy-indicator {
@@ -439,6 +451,136 @@
 
       #copy-indicator.show {
         opacity: 1;
+      }
+
+      /* ag-ui Preview Button */
+      #ag-ui-button {
+        position: absolute;
+        bottom: 20px;
+        right: 20px;
+        background: linear-gradient(135deg, #38bdf8 0%, #0ea5e9 100%);
+        color: #0a0a0a;
+        border: none;
+        border-radius: 6px;
+        padding: 8px 14px;
+        font-weight: 600;
+        font-size: 11px;
+        cursor: pointer;
+        box-shadow: 0 2px 8px rgba(56, 189, 248, 0.4);
+        transition: all 0.2s;
+        z-index: 100;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      #ag-ui-button:hover {
+        background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(56, 189, 248, 0.5);
+      }
+
+      #ag-ui-button:active {
+        transform: translateY(0);
+      }
+
+      /* ag-ui Modal */
+      #ag-ui-modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.8);
+        z-index: 10000;
+        backdrop-filter: blur(4px);
+      }
+
+      #ag-ui-modal-content {
+        position: relative;
+        width: 90%;
+        max-width: 1200px;
+        height: 90%;
+        margin: 2.5% auto;
+        background: #0f172a;
+        border-radius: 16px;
+        border: 1px solid rgba(148, 163, 184, 0.2);
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+        display: flex;
+        flex-direction: column;
+      }
+
+      #ag-ui-modal-header {
+        padding: 20px;
+        border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      #ag-ui-modal-header h3 {
+        margin: 0;
+        color: #38bdf8;
+        font-size: 20px;
+      }
+
+      #ag-ui-close {
+        background: none;
+        border: none;
+        color: #94a3b8;
+        font-size: 24px;
+        cursor: pointer;
+        padding: 0;
+        width: 32px;
+        height: 32px;
+        border-radius: 4px;
+        transition: all 0.2s;
+      }
+
+      #ag-ui-close:hover {
+        background: rgba(148, 163, 184, 0.15);
+        color: #f8fafc;
+      }
+
+      #ag-ui-container {
+        flex: 1;
+        overflow: auto;
+        padding: 24px;
+      }
+
+      /* Mobile responsiveness for ag-ui */
+      @media (max-width: 768px) {
+        #ag-ui-button {
+          bottom: 16px;
+          right: 16px;
+          font-size: 10px;
+          padding: 6px 10px;
+        }
+
+        #keyboard-hint {
+          bottom: 70px;
+          font-size: 10px;
+          padding: 6px 12px;
+        }
+
+        #ag-ui-modal-content {
+          width: 95%;
+          height: 95%;
+          margin: 2.5% auto;
+        }
+
+        #ag-ui-modal-header {
+          padding: 16px;
+        }
+
+        #ag-ui-modal-header h3 {
+          font-size: 16px;
+        }
+
+        #ag-ui-container {
+          padding: 16px;
+        }
       }
     </style>
   </head>
@@ -481,14 +623,31 @@
           <span id="status-text">Connecting...</span>
         </div>
 
-        <div id="keyboard-hint">
+        <div id="keyboard-hint" title="Click to hide">
           💡 Commands: cli, cd, ls, cat, pwd, deno, clear | Ctrl+C to interrupt | Select text to copy
         </div>
+
+        <!-- ag-ui Preview Button -->
+        <button id="ag-ui-button" title="View agent state and tool calls">
+          <span>🔍</span>
+          <span>AG-UI</span>
+        </button>
       </div>
     </div>
 
     <!-- Copy indicator -->
     <div id="copy-indicator">✓ Copied to clipboard!</div>
+
+    <!-- ag-ui Modal -->
+    <div id="ag-ui-modal">
+      <div id="ag-ui-modal-content">
+        <div id="ag-ui-modal-header">
+          <h3>Agent State & Tool Calls</h3>
+          <button id="ag-ui-close">&times;</button>
+        </div>
+        <div id="ag-ui-container"></div>
+      </div>
+    </div>
 
     <script>
       const terminal = document.getElementById('terminal');
@@ -504,6 +663,7 @@
       const sidebar = document.getElementById('sidebar');
       const sidebarToggle = document.getElementById('sidebar-toggle');
       const sidebarBackdrop = document.getElementById('sidebar-backdrop');
+      const keyboardHint = document.getElementById('keyboard-hint');
       
       let ws = null;
       let currentPath = '..';
@@ -1011,6 +1171,272 @@
           }, 300);
         }
       });
+
+      // Keyboard hint toggle
+      keyboardHint.addEventListener('click', () => {
+        keyboardHint.classList.toggle('hidden');
+      });
+
+      // ag-ui Modal Controls
+      const agUiModal = document.getElementById('ag-ui-modal');
+      const agUiButton = document.getElementById('ag-ui-button');
+      const agUiClose = document.getElementById('ag-ui-close');
+      const agUiContainer = document.getElementById('ag-ui-container');
+      let agUiInitialized = false;
+
+      agUiButton.addEventListener('click', () => {
+        agUiModal.style.display = 'block';
+        if (!agUiInitialized) {
+          initializeAgUi();
+          agUiInitialized = true;
+        }
+      });
+
+      agUiClose.addEventListener('click', () => {
+        agUiModal.style.display = 'none';
+      });
+
+      // Close on outside click
+      agUiModal.addEventListener('click', (e) => {
+        if (e.target === agUiModal) {
+          agUiModal.style.display = 'none';
+        }
+      });
+
+      // Close on Escape key
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && agUiModal.style.display === 'block') {
+          agUiModal.style.display = 'none';
+        }
+      });
+
+      let currentAgentExecution = null;
+      let agUiCore = null;
+
+      async function initializeAgUi() {
+        try {
+          agUiContainer.innerHTML = '<div style="color: #8be9fd; padding: 20px; text-align: center;">Loading agents...</div>';
+          
+          // Import @ag-ui/core protocol for event schemas
+          if (!agUiCore) {
+            agUiCore = await import('https://esm.sh/@ag-ui/core@latest');
+            console.log('✅ @ag-ui/core loaded:', agUiCore);
+          }
+          
+          // Fetch list of agents
+          const response = await fetch('/api/files?path=agents');
+          const data = await response.json();
+          
+          if (data.error) {
+            throw new Error(data.error);
+          }
+          
+          if (!data.entries) {
+            throw new Error('Failed to load agents');
+          }
+          
+          // Filter for directories only (agents)
+          const agents = data.entries.filter(f => f.isDirectory && !f.name.startsWith('.'));
+          
+          if (agents.length === 0) {
+            agUiContainer.innerHTML = `
+              <div style="text-align: center; padding: 40px; color: #94a3b8;">
+                <div style="font-size: 48px; margin-bottom: 16px;">🤖</div>
+                <h3 style="color: #cbd5e1; margin-bottom: 8px;">No agents found</h3>
+                <p style="font-size: 13px; margin-bottom: 20px;">Create an agent using the CLI to get started.</p>
+                <code style="background: rgba(0,0,0,0.5); padding: 8px 12px; border-radius: 4px; font-size: 12px; display: inline-block;">deno task cli</code>
+              </div>
+            `;
+            return;
+          }
+          
+          // Display agent list
+          agUiContainer.innerHTML = `
+            <div style="color: #e2e8f0;">
+              <div style="margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid rgba(148,163,184,0.15);">
+                <p style="color: #94a3b8; font-size: 13px;">Select an agent to execute and monitor with AG-UI protocol</p>
+              </div>
+              <div id="agent-list" style="display: grid; gap: 12px;">
+                ${agents.map(agent => `
+                  <div class="agent-item" data-agent="${agent.name}" style="
+                    background: rgba(15,23,42,0.65);
+                    border: 1px solid rgba(148,163,184,0.12);
+                    border-radius: 8px;
+                    padding: 16px;
+                    cursor: pointer;
+                    transition: all 0.2s;
+                  " onmouseover="this.style.background='rgba(56,189,248,0.1)'; this.style.borderColor='rgba(56,189,248,0.3)'" onmouseout="this.style.background='rgba(15,23,42,0.65)'; this.style.borderColor='rgba(148,163,184,0.12)'">
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                      <div style="font-size: 24px;">🤖</div>
+                      <div style="flex: 1;">
+                        <div style="font-weight: 600; color: #f8fafc; margin-bottom: 4px;">${agent.name}</div>
+                        <div style="font-size: 12px; color: #94a3b8;">Click to execute with AG-UI monitoring</div>
+                      </div>
+                      <div style="color: #38bdf8; font-size: 20px;">▶</div>
+                    </div>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          `;
+          
+          // Add click handlers
+          document.querySelectorAll('.agent-item').forEach(item => {
+            item.addEventListener('click', () => {
+              const agentName = item.dataset.agent;
+              executeAgent(agentName);
+            });
+          });
+          
+          console.log('✅ Agent list loaded:', agents.length, 'agents');
+          
+        } catch (error) {
+          agUiContainer.innerHTML = `
+            <div style="color: #f87171; padding: 20px;">
+              <h4 style="margin-bottom: 12px;">Failed to load agents</h4>
+              <p style="color: #94a3b8; font-size: 13px; line-height: 1.6;">
+                ${error.message}
+              </p>
+              <button onclick="initializeAgUi()" style="margin-top: 16px; background: #38bdf8; color: #0a0a0a; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: 600;">
+                Retry
+              </button>
+            </div>
+          `;
+          console.error('Agent list error:', error);
+        }
+      }
+
+      async function executeAgent(agentName) {
+        try {
+          // Update UI to show execution state
+          agUiContainer.innerHTML = `
+            <div style="color: #e2e8f0; line-height: 1.6;">
+              <div style="background: rgba(15,23,42,0.65); border-radius: 12px; padding: 20px; margin-bottom: 16px; border: 1px solid rgba(148,163,184,0.12);">
+                <h4 style="color: #38bdf8; margin-bottom: 12px; font-size: 16px;">🤖 Agent Overview</h4>
+                <div style="font-size: 13px; color: #cbd5e1;">
+                  <p><strong>Name:</strong> ${agentName}</p>
+                  <p><strong>Status:</strong> <span style="color: #f1fa8c;" id="agent-status">Starting...</span></p>
+                  <p><strong>Framework:</strong> Mastra + @ag-ui/core Protocol</p>
+                </div>
+              </div>
+
+              <div style="background: rgba(15,23,42,0.65); border-radius: 12px; padding: 20px; margin-bottom: 16px; border: 1px solid rgba(148,163,184,0.12);">
+                <h4 style="color: #38bdf8; margin-bottom: 12px; font-size: 16px;">📊 Agent Output</h4>
+                <div id="agent-output" style="font-size: 12px; color: #cbd5e1; font-family: monospace; background: rgba(0,0,0,0.5); padding: 12px; border-radius: 6px; max-height: 300px; overflow-y: auto;">
+                  <p style="color: #8be9fd;">Executing agent...</p>
+                </div>
+              </div>
+
+              <div style="background: rgba(15,23,42,0.65); border-radius: 12px; padding: 20px; margin-bottom: 16px; border: 1px solid rgba(148,163,184,0.12);">
+                <h4 style="color: #38bdf8; margin-bottom: 12px; font-size: 16px;">🔧 Tool Calls</h4>
+                <div id="tool-calls-content" style="font-size: 13px; color: #cbd5e1;">
+                  <p style="color: #94a3b8;">Monitoring tool usage...</p>
+                </div>
+              </div>
+
+              <div style="display: flex; gap: 8px;">
+                <button onclick="stopAgent()" style="background: #ef4444; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 13px;">
+                  ⏹ Stop
+                </button>
+                <button onclick="initializeAgUi()" style="background: rgba(148,163,184,0.2); color: #cbd5e1; border: 1px solid rgba(148,163,184,0.3); padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 13px;">
+                  ← Back to List
+                </button>
+              </div>
+            </div>
+          `;
+          
+          // Execute the agent via WebSocket
+          const command = `deno run --allow-read --allow-write --allow-env --allow-net --allow-sys agents/${agentName}/index.ts`;
+          
+          if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: 'run_command', command }));
+            
+            // Set up output capture
+            setupAgentOutputCapture(agentName);
+            
+            console.log('▶ Executing agent:', agentName);
+          } else {
+            throw new Error('WebSocket not connected');
+          }
+          
+        } catch (error) {
+          agUiContainer.innerHTML = `
+            <div style="color: #f87171; padding: 20px;">
+              <h4 style="margin-bottom: 12px;">Failed to execute agent</h4>
+              <p style="color: #94a3b8; font-size: 13px;">${error.message}</p>
+              <button onclick="initializeAgUi()" style="margin-top: 16px; background: #38bdf8; color: #0a0a0a; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: 600;">
+                Back to List
+              </button>
+            </div>
+          `;
+        }
+      }
+
+      function setupAgentOutputCapture(agentName) {
+        // Store original onmessage handler
+        const originalHandler = ws.onmessage;
+        
+        // Create enhanced handler for agent output
+        ws.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            
+            // Capture agent output
+            if (data.type === 'output') {
+              const outputEl = document.getElementById('agent-output');
+              if (outputEl) {
+                const line = document.createElement('div');
+                line.textContent = data.data;
+                line.style.whiteSpace = 'pre-wrap';
+                line.style.marginBottom = '2px';
+                outputEl.appendChild(line);
+                outputEl.scrollTop = outputEl.scrollHeight;
+              }
+            }
+            
+            // Update status on process exit
+            if (data.type === 'process_exit') {
+              const statusEl = document.getElementById('agent-status');
+              if (statusEl) {
+                if (data.code === 0) {
+                  statusEl.textContent = 'Completed ✓';
+                  statusEl.style.color = '#50fa7b';
+                } else {
+                  statusEl.textContent = `Failed (code: ${data.code})`;
+                  statusEl.style.color = '#ff5555';
+                }
+              }
+            }
+            
+            // Call original handler
+            if (originalHandler) {
+              originalHandler.call(ws, event);
+            }
+          } catch (error) {
+            console.error('Error processing agent output:', error);
+          }
+        };
+        
+        currentAgentExecution = agentName;
+      }
+
+      function stopAgent() {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          // Send Ctrl+C signal
+          ws.send(JSON.stringify({ type: 'input', data: '\x03' }));
+          
+          const statusEl = document.getElementById('agent-status');
+          if (statusEl) {
+            statusEl.textContent = 'Stopped';
+            statusEl.style.color = '#f1fa8c';
+          }
+        }
+      }
+
+      // Make functions globally accessible
+      window.initializeAgUi = initializeAgUi;
+      window.executeAgent = executeAgent;
+      window.stopAgent = stopAgent;
 
       // Initialize
       console.log('🏭 ERA Web UI Loading...');
