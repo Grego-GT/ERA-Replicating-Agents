@@ -1,11 +1,7 @@
 
 <img width="256" height="256" alt="era-logo" src="https://github.com/user-attachments/assets/ef2318fa-3f69-42ac-950b-c6765756cd51" />
 
-<video width="800" height="450" controls>
-  <source src="https://youtu.be/XFBR9owMNFQ" type="video/mp4">
-  Your browser does not support the video tag.
-</video>
-
+Demo: [![Watch the demo](https://img.youtube.com/vi/XFBR9owMNFQ/0.jpg)](https://youtu.be/XFBR9owMNFQ)
 https://github.com/user-attachments/assets/7a153774-7d1d-4530-bcc7-1c6d798c701e
 
 
