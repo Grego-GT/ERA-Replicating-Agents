@@ -53,6 +53,21 @@ export interface AgentFiles {
   metadataFile?: string;
 }
 /**
+ * Session metadata for tracking continuation runs
+ * Each session represents one CLI invocation
+ */
+export interface SessionInfo {
+  /** Session number (1-indexed, sequential) */
+  sessionNumber: number;
+  /** Session timestamp */
+  timestamp: string;
+  /** User prompt for this session */
+  prompt: string;
+  /** All generation attempts for this session */
+  attempts: GenerationAttempt[];
+}
+
+/**
  * Comprehensive metadata for a single agent creation run
  */
 export interface AgentCreationHistory {
@@ -60,14 +75,21 @@ export interface AgentCreationHistory {
   versionID: string;
   /** Agent name */
   agentName: string;
-  /** User's original prompt */
+  /** AI-generated description of what this agent does */
+  agentDescription?: string;
+  /** User's original prompt (from first creation) */
   ogprompt: string;
-  /** When the run started (ISO string) */
+  /** When the run started (ISO string) - updated on each continuation */
   timestamp: string;
+  /** All continuation sessions (for tracking multiple CLI invocations) */
+  sessions?: SessionInfo[];
   // ========================================
   // AI Generation Details (if applicable)
   // ========================================
-  /** All metadata of generation attempts of this agent creation */
+  /** 
+   * @deprecated Use sessions[].attempts instead
+   * Kept for backward compatibility with old agent.json files
+   */
   attempts?: GenerationAttempt[];
   /** System prompt used */
   systemPrompt?: string;
