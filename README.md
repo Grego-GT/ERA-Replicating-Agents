@@ -1,6 +1,8 @@
 
 <img width="256" height="256" alt="era-logo" src="https://github.com/user-attachments/assets/ef2318fa-3f69-42ac-950b-c6765756cd51" />
 
+Demo:
+![https://f2.phage.directory/capsid/SBCB3ZUl/era-demo-draft.mp4](Demo Video)
 
 https://github.com/user-attachments/assets/7a153774-7d1d-4530-bcc7-1c6d798c701e
 
