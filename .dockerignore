@@ -1,0 +1,41 @@
+# Git
+.git
+.gitignore
+*.md
+
+# Node modules (if any)
+node_modules
+web/node_modules
+
+# Deno
+.deno
+deno.lock
+web/deno.lock
+
+# Build outputs
+dist
+web/dist
+
+# Agents - uncomment to exclude (keeping agents for demos)
+# agents/*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Logs
+*.log
+
+# Environment (secrets should be set via fly secrets)
+.env
+web/.env
+
+# Daytona
+daytona
+

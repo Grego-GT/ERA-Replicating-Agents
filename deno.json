@@ -11,8 +11,7 @@
     "./daytona": "./utils/daytona/index.ts",
     "./weave": "./utils/weave/index.ts",
     "./wandb": "./utils/wandb/index.ts",
-    "./codegen": "./utils/codegen/index.ts",
-    "./@daytonaio/sdk": "npm:@daytonaio/sdk"
+    "./codegen": "./utils/codegen/index.ts"
   },
   "tasks": {
     "cli": "deno run --allow-read --allow-write --allow-env --allow-net --allow-sys cli.ts",
@@ -26,6 +25,8 @@
     "demo:daytona": "deno run --allow-net --allow-read --allow-env --allow-sys tests/daytona/demo.ts",
     "dev": "deno run --allow-net --allow-read --allow-env --allow-sys --watch main.ts",
     "serve": "deno serve --port 9995 --watch --allow-read --allow-env --allow-write --allow-net --allow-sys --allow-import ./main.ts",
+    "web": "cd web && deno task dev",
+    "web:build": "cd web && deno task build",
     "git": "git add . && git commit -m 'bump' && git push origin main",
     "prod": "deployctl deploy --prod --project=era-agents",
     "test:wandb": "deno run --allow-net --allow-read --allow-env --allow-sys utils/wandb/test.ts",
@@ -81,7 +82,7 @@
     "singleQuote": false,
     "proseWrap": "preserve"
   },
-  "nodeModulesDir": "none",
+  "nodeModulesDir": false,
   "imports": {
     "weave": "npm:weave@latest",
     "@daytonaio/sdk": "npm:@daytonaio/sdk@latest",

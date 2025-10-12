@@ -1,0 +1,750 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AgFactory - AI Agent Creator</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      :root {
+        font-family: 'Courier New', monospace;
+        color-scheme: dark;
+        background-color: #0a0a0a;
+      }
+
+      html, body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+      }
+
+      #root {
+        width: 100%;
+        height: 100vh;
+        display: flex;
+        flex-wrap: nowrap; /* Prevent wrapping */
+        background: #0a0a0a;
+        color: #f0f0f0;
+      }
+
+      #sidebar {
+        width: 280px;
+        min-width: 280px; /* Ensure it doesn't shrink */
+        max-width: 280px; /* Ensure it doesn't grow */
+        background: #1a1a1a;
+        border-right: 1px solid #333;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        flex-shrink: 0; /* Prevent flex from shrinking it */
+        z-index: 10; /* Ensure it stays on top */
+      }
+
+      #sidebar-header {
+        padding: 16px;
+        border-bottom: 1px solid #333;
+        background: #151515;
+      }
+
+      #sidebar-title {
+        font-weight: bold;
+        color: #50fa7b;
+        margin-bottom: 8px;
+        font-size: 14px;
+      }
+
+      #current-path {
+        font-size: 11px;
+        color: #888;
+        word-break: break-all;
+      }
+
+      #file-explorer {
+        flex: 1;
+        overflow-y: auto;
+        padding: 8px;
+      }
+
+      .file-item, .folder-item {
+        padding: 8px 12px;
+        margin: 2px 0;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: background 0.2s;
+        font-size: 13px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .file-item:hover, .folder-item:hover {
+        background: #2a2a2a;
+      }
+
+      .folder-item {
+        color: #8be9fd;
+        font-weight: 500;
+      }
+
+      .file-item {
+        color: #f0f0f0;
+      }
+
+      .file-icon, .folder-icon {
+        flex-shrink: 0;
+      }
+
+      #main-content {
+        flex: 1;
+        min-width: 0; /* Allow flexbox to shrink below content size */
+        display: flex;
+        flex-direction: column;
+        position: relative;
+        overflow: hidden; /* Prevent overflow from breaking layout */
+      }
+
+      #terminal {
+        flex: 1;
+        background: #0a0a0a;
+        padding: 20px;
+        overflow-y: auto;
+        font-family: 'Courier New', monospace;
+        font-size: 14px;
+        line-height: 1.5;
+        white-space: pre-wrap;
+        word-wrap: break-word;
+        user-select: text;
+        cursor: text;
+      }
+
+      #terminal:focus {
+        outline: none;
+      }
+
+      #terminal::selection {
+        background: rgba(255, 255, 255, 0.2);
+        color: inherit;
+      }
+
+      #input-container {
+        padding: 16px 20px;
+        background: #0f0f0f;
+        border-top: 2px solid #50fa7b;
+        display: flex;
+        align-items: center;
+        box-shadow: 0 -4px 20px rgba(80, 250, 123, 0.1);
+      }
+
+      #prompt {
+        color: #50fa7b;
+        margin-right: 8px;
+        user-select: none;
+        font-weight: bold;
+        font-size: 16px;
+      }
+
+      #user-input {
+        flex: 1;
+        background: transparent;
+        border: none;
+        outline: none;
+        color: #f0f0f0;
+        font-family: 'Courier New', monospace;
+        font-size: 14px;
+        padding: 4px 8px;
+        position: relative;
+        caret-color: #50fa7b;
+      }
+
+      #user-input:focus {
+        background: rgba(80, 250, 123, 0.08);
+        border-radius: 3px;
+      }
+
+      /* Custom blinking cursor effect */
+      #input-container::after {
+        content: '▋';
+        color: #50fa7b;
+        font-size: 16px;
+        margin-left: -18px;
+        animation: blink-cursor 1s step-end infinite;
+        pointer-events: none;
+      }
+
+      #input-container.typing::after {
+        display: none;
+      }
+
+      @keyframes blink-cursor {
+        0%, 49% { opacity: 1; }
+        50%, 100% { opacity: 0; }
+      }
+
+      .status-indicator {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background: #1a1a1a;
+        padding: 8px 16px;
+        border-radius: 8px;
+        border: 1px solid #333;
+        z-index: 1000;
+      }
+
+      .status-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #50fa7b;
+      }
+
+      .status-dot.connecting {
+        background: #f1fa8c;
+        animation: pulse 1s infinite;
+      }
+
+      .status-dot.disconnected {
+        background: #ff5555;
+      }
+
+      @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+      }
+
+      #refresh-files {
+        padding: 6px 12px;
+        background: #2a2a2a;
+        border: 1px solid #444;
+        border-radius: 4px;
+        color: #f0f0f0;
+        font-size: 11px;
+        cursor: pointer;
+        transition: all 0.2s;
+        margin-top: 8px;
+      }
+
+      #refresh-files:hover {
+        background: #333;
+        border-color: #555;
+      }
+
+      .loading {
+        text-align: center;
+        padding: 20px;
+        color: #888;
+        font-size: 12px;
+      }
+
+      #keyboard-hint {
+        position: absolute;
+        bottom: 90px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(26, 26, 26, 0.9);
+        border: 1px solid #333;
+        border-radius: 6px;
+        padding: 8px 16px;
+        font-size: 11px;
+        color: #888;
+        pointer-events: none;
+        backdrop-filter: blur(4px);
+      }
+
+      #copy-indicator {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: rgba(80, 250, 123, 0.9);
+        color: #0a0a0a;
+        padding: 12px 24px;
+        border-radius: 8px;
+        font-weight: bold;
+        z-index: 10000;
+        opacity: 0;
+        transition: opacity 0.3s;
+        pointer-events: none;
+      }
+
+      #copy-indicator.show {
+        opacity: 1;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root">
+      <!-- Sidebar File Explorer -->
+      <div id="sidebar">
+        <div id="sidebar-header">
+          <div id="sidebar-title">📁 File Explorer</div>
+          <div id="current-path">/Users/binsquare/Documents/AgFactory</div>
+          <button id="refresh-files">🔄 Refresh</button>
+        </div>
+        <div id="file-explorer">
+          <div class="loading">Loading files...</div>
+        </div>
+      </div>
+
+      <!-- Main Terminal Content -->
+      <div id="main-content">
+        <div id="terminal" tabindex="-1"></div>
+        
+        <div id="input-container">
+          <span id="prompt">$</span>
+          <input type="text" id="user-input" autofocus autocomplete="off" spellcheck="false" />
+        </div>
+
+        <div class="status-indicator">
+          <div class="status-dot" id="status-dot"></div>
+          <span id="status-text">Connecting...</span>
+        </div>
+
+        <div id="keyboard-hint">
+          💡 Commands: cli, cd, ls, cat, pwd, deno, clear | Ctrl+C to interrupt | Select text to copy
+        </div>
+      </div>
+    </div>
+
+    <!-- Copy indicator -->
+    <div id="copy-indicator">✓ Copied to clipboard!</div>
+
+    <script>
+      const terminal = document.getElementById('terminal');
+      const userInput = document.getElementById('user-input');
+      const statusDot = document.getElementById('status-dot');
+      const statusText = document.getElementById('status-text');
+      const fileExplorer = document.getElementById('file-explorer');
+      const currentPathEl = document.getElementById('current-path');
+      const refreshBtn = document.getElementById('refresh-files');
+      const copyIndicator = document.getElementById('copy-indicator');
+      
+      let ws = null;
+      let currentPath = '..';
+      let currentRelativePath = '..';
+
+      // ANSI color map
+      const ansiColors = {
+        '30': '#000000', '31': '#ff5555', '32': '#50fa7b', '33': '#f1fa8c',
+        '34': '#bd93f9', '35': '#ff79c6', '36': '#8be9fd', '37': '#f8f8f2',
+        '90': '#6272a4', '91': '#ff6e6e', '92': '#69ff94', '93': '#ffffa5',
+        '94': '#d6acff', '95': '#ff92df', '96': '#a4ffff', '97': '#ffffff',
+      };
+
+      function parseAnsi(text) {
+        // Remove cursor positioning and screen clearing codes
+        text = text.replace(/\x1b\[\d+;\d+H/g, ''); // Cursor position
+        text = text.replace(/\x1b\[\d*J/g, '');     // Clear screen
+        text = text.replace(/\x1b\[\d*K/g, '');     // Clear line
+        
+        // Parse color codes
+        const parts = text.split(/(\x1b\[\d*m)/g);
+        let html = '';
+        let currentColor = '#f0f0f0';
+        let isBold = false;
+        
+        for (let i = 0; i < parts.length; i++) {
+          const part = parts[i];
+          
+          // Check if this is an ANSI code
+          const match = part.match(/\x1b\[(\d*)m/);
+          if (match) {
+            const code = match[1];
+            
+            if (code === '0' || code === '') {
+              // Reset
+              currentColor = '#f0f0f0';
+              isBold = false;
+            } else if (code === '1') {
+              // Bold
+              isBold = true;
+            } else if (ansiColors[code]) {
+              // Color
+              currentColor = ansiColors[code];
+            }
+          } else if (part) {
+            // Regular text
+            const style = `color: ${currentColor};${isBold ? ' font-weight: bold;' : ''}`;
+            html += `<span style="${style}">${escapeHtml(part)}</span>`;
+          }
+        }
+        
+        return html;
+      }
+
+      function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+      }
+
+      function write(text) {
+        // Parse ANSI codes and append as HTML
+        const html = parseAnsi(text);
+        const span = document.createElement('span');
+        span.innerHTML = html;
+        terminal.appendChild(span);
+        terminal.scrollTop = terminal.scrollHeight;
+      }
+
+      function writeLine(text, color = '#f0f0f0') {
+        const span = document.createElement('span');
+        span.style.color = color;
+        span.textContent = text + '\n';
+        terminal.appendChild(span);
+        terminal.scrollTop = terminal.scrollHeight;
+      }
+
+      function writeHTML(html) {
+        const span = document.createElement('span');
+        span.innerHTML = html + '\n';
+        terminal.appendChild(span);
+        terminal.scrollTop = terminal.scrollHeight;
+      }
+
+      function setStatus(status) {
+        statusDot.className = 'status-dot ' + status;
+        if (status === 'connected') {
+          statusText.textContent = 'Connected';
+        } else if (status === 'connecting') {
+          statusText.textContent = 'Connecting...';
+        } else {
+          statusText.textContent = 'Disconnected';
+        }
+      }
+
+      // File Explorer Functions
+      async function loadFiles(relativePath = '..') {
+        try {
+          console.log('📂 Loading files from relative path:', relativePath);
+          fileExplorer.innerHTML = '<div class="loading">Loading files...</div>';
+          const response = await fetch(`/api/files?path=${encodeURIComponent(relativePath)}`);
+          const data = await response.json();
+          console.log('📂 Received data:', data);
+          
+          if (data.error) {
+            fileExplorer.innerHTML = `<div class="loading" style="color: #ff5555;">Error: ${data.error}</div>`;
+            return;
+          }
+
+          // Store both absolute (for display) and relative (for API calls)
+          currentPath = data.path;
+          currentRelativePath = relativePath;
+          currentPathEl.textContent = data.path;
+          renderFileTree(data.entries);
+        } catch (error) {
+          console.error('Failed to load files:', error);
+          fileExplorer.innerHTML = '<div class="loading" style="color: #ff5555;">Failed to load files</div>';
+        }
+      }
+
+      function getFileIcon(name, isDirectory) {
+        if (isDirectory) return '📁';
+        if (name.endsWith('.ts') || name.endsWith('.tsx')) return '📘';
+        if (name.endsWith('.js') || name.endsWith('.jsx')) return '📙';
+        if (name.endsWith('.json')) return '📋';
+        if (name.endsWith('.md')) return '📝';
+        if (name.endsWith('.html')) return '🌐';
+        if (name.endsWith('.css')) return '🎨';
+        return '📄';
+      }
+
+      function renderFileTree(entries) {
+        fileExplorer.innerHTML = '';
+
+        // Sort: directories first, then files
+        const sorted = entries.sort((a, b) => {
+          if (a.isDirectory && !b.isDirectory) return -1;
+          if (!a.isDirectory && b.isDirectory) return 1;
+          return a.name.localeCompare(b.name);
+        });
+
+        sorted.forEach(entry => {
+          const item = document.createElement('div');
+          const icon = getFileIcon(entry.name, entry.isDirectory);
+          
+          if (entry.isDirectory) {
+            item.className = 'folder-item';
+            item.innerHTML = `<span class="folder-icon">${icon}</span><span>${entry.name}/</span>`;
+            item.onclick = () => loadFiles(entry.path);
+          } else {
+            item.className = 'file-item';
+            item.innerHTML = `<span class="file-icon">${icon}</span><span>${entry.name}</span>`;
+            item.onclick = () => viewFile(entry.path);
+          }
+          
+          fileExplorer.appendChild(item);
+        });
+
+        // Add parent directory link if not at root
+        if (currentRelativePath !== '..') {
+          const parentItem = document.createElement('div');
+          parentItem.className = 'folder-item';
+          parentItem.innerHTML = '<span class="folder-icon">⬆️</span><span>..</span>';
+          parentItem.onclick = () => {
+            // Go up one level from current relative path
+            const pathParts = currentRelativePath.split('/');
+            const parentPath = pathParts.length > 1 
+              ? pathParts.slice(0, -1).join('/') || '..'
+              : '..';
+            loadFiles(parentPath);
+          };
+          fileExplorer.insertBefore(parentItem, fileExplorer.firstChild);
+        }
+      }
+
+      function viewFile(path) {
+        writeLine('', '#888');
+        writeLine(`📄 Viewing: ${path}`, '#8be9fd');
+        writeLine('─'.repeat(60), '#444');
+        
+        fetch(`/api/file-content?path=${encodeURIComponent(path)}`)
+          .then(res => res.json())
+          .then(data => {
+            if (data.error) {
+              writeLine(`Error: ${data.error}`, '#ff5555');
+            } else {
+              const lines = data.content.split('\n').slice(0, 50); // First 50 lines
+              lines.forEach(line => writeLine(line));
+              if (data.content.split('\n').length > 50) {
+                writeLine('...', '#888');
+                writeLine(`(showing first 50 lines of ${data.content.split('\n').length})`, '#888');
+              }
+            }
+            writeLine('─'.repeat(60), '#444');
+            writeLine('');
+          })
+          .catch(error => {
+            writeLine(`Error loading file: ${error.message}`, '#ff5555');
+          });
+      }
+
+      // WebSocket Connection
+      function connectWebSocket() {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${protocol}//${window.location.host}/ws`;
+        
+        console.log('🔌 Connecting to:', wsUrl);
+        setStatus('connecting');
+
+        ws = new WebSocket(wsUrl);
+
+        ws.onopen = () => {
+          console.log('✅ WebSocket connected');
+          setStatus('connected');
+          
+          writeHTML('<span style="color: #50fa7b;">╔════════════════════════════════════════════════════════════════╗</span>');
+          writeHTML('<span style="color: #50fa7b;">║              🏭  AgFactory Web Terminal                        ║</span>');
+          writeHTML('<span style="color: #50fa7b;">║              AI Agent Creator - v1.0.0                         ║</span>');
+          writeHTML('<span style="color: #50fa7b;">╚════════════════════════════════════════════════════════════════╝</span>');
+          writeLine('');
+          writeLine('✅ Connected! Starting AgFactory CLI...', '#8be9fd');
+          writeLine('💡 Type your response and press Enter. Use Ctrl+C to interrupt.', '#888');
+          writeLine('');
+
+          // Start the CLI
+          ws.send(JSON.stringify({ type: 'start_cli' }));
+        };
+
+        ws.onmessage = (event) => {
+          try {
+            const message = JSON.parse(event.data);
+            
+            if (message.type === 'output') {
+              // Write output directly
+              write(message.data);
+            } else if (message.type === 'process_exit' || message.type === 'exit') {
+              // Process exited but socket stays alive!
+              writeLine('');
+              if (message.code !== 0) {
+                writeLine(`⚠️  Process exited with code: ${message.code}`, '#f1fa8c');
+              }
+              writeLine('💡 Type a command: cli, cd agents, ls, deno run agents/<name>/index.ts', '#8be9fd');
+              writeLine('');
+              // Refresh file list when process exits
+              loadFiles(currentRelativePath);
+            } else if (message.type === 'clear') {
+              // Clear terminal
+              terminal.innerHTML = '';
+            } else if (message.type === 'error') {
+              writeLine('');
+              writeLine(`❌ Error: ${message.message}`, '#ff5555');
+            } else if (message.type === 'connected') {
+              console.log('✅ Server confirmed connection');
+            }
+          } catch (error) {
+            console.error('Error parsing message:', error);
+          }
+        };
+
+        ws.onerror = (error) => {
+          console.error('❌ WebSocket error:', error);
+          setStatus('disconnected');
+          writeLine('');
+          writeLine('❌ Connection error', '#ff5555');
+        };
+
+        ws.onclose = () => {
+          console.log('🔌 WebSocket closed');
+          setStatus('disconnected');
+          writeLine('');
+          writeLine('⚠️  Connection closed', '#f1fa8c');
+          writeLine('💡 Refresh to reconnect', '#8be9fd');
+        };
+      }
+
+      // Add copy detection to show indicator
+      document.addEventListener('copy', (e) => {
+        const selection = window.getSelection();
+        if (selection && selection.toString().length > 0) {
+          showCopyIndicator();
+        }
+      });
+
+      function showCopyIndicator() {
+        copyIndicator.classList.add('show');
+        setTimeout(() => {
+          copyIndicator.classList.remove('show');
+        }, 1500);
+      }
+
+      // Add paste support
+      userInput.addEventListener('paste', (e) => {
+        // Let the default paste behavior work, but log it
+        console.log('📋 Pasted text into input');
+      });
+
+      // Show/hide cursor based on typing
+      const inputContainer = document.getElementById('input-container');
+      
+      userInput.addEventListener('input', () => {
+        if (userInput.value.length > 0) {
+          inputContainer.classList.add('typing');
+        } else {
+          inputContainer.classList.remove('typing');
+        }
+      });
+
+      // Handle input - only send on Enter, but handle Ctrl+C and Ctrl+D immediately
+      userInput.addEventListener('keydown', (e) => {
+        if (!ws || ws.readyState !== WebSocket.OPEN) return;
+
+        // Special keys that bypass normal input
+        if (e.key === 'c' && e.ctrlKey) {
+          // Ctrl+C - Send interrupt signal immediately
+          e.preventDefault();
+          ws.send(JSON.stringify({ type: 'input', data: '\x03' }));
+          console.log('📤 Sent Ctrl+C (interrupt)');
+          // Clear the input field
+          userInput.value = '';
+        } else if (e.key === 'd' && e.ctrlKey) {
+          // Ctrl+D - Send EOF immediately
+          e.preventDefault();
+          ws.send(JSON.stringify({ type: 'input', data: '\x04' }));
+          console.log('📤 Sent Ctrl+D (EOF)');
+          // Clear the input field
+          userInput.value = '';
+        } else if (e.key === 'Enter') {
+          // Enter - Send the whole line
+          e.preventDefault();
+          const input = userInput.value.trim();
+          userInput.value = '';
+          
+          // Echo what was typed (even if empty for visual feedback)
+          if (input) {
+            writeLine('$ ' + input, '#bd93f9');
+          }
+          
+          // Always send to process (including empty lines for "skip" scenarios)
+          if (ws.readyState === WebSocket.OPEN) {
+            // Try to detect if it's a new command vs process input
+            // For simplicity, we'll send as command if it starts with known commands
+            const isCommand = input && (
+              input.startsWith('cli') || 
+              input.startsWith('deno') || 
+              input.startsWith('ls') || 
+              input.startsWith('cat') ||
+              input.startsWith('pwd') ||
+              input.startsWith('cd') ||
+              input === 'clear'
+            );
+            
+            if (isCommand) {
+              // Run as new command
+              ws.send(JSON.stringify({ type: 'run_command', command: input }));
+              console.log('📤 Sent command:', input);
+            } else {
+              // Send as input to running process (including empty lines)
+              ws.send(JSON.stringify({ type: 'input', data: input + '\n' }));
+              console.log('📤 Sent input:', input || '(empty line)');
+            }
+          }
+          
+          // Remove typing class after sending
+          inputContainer.classList.remove('typing');
+        }
+        // All other keys are handled normally by the input field
+      });
+
+      // Keep input focused (but not when selecting text in terminal)
+      userInput.focus();
+      
+      let isSelecting = false;
+      terminal.addEventListener('mousedown', () => {
+        isSelecting = true;
+      });
+      
+      document.addEventListener('mouseup', () => {
+        // If we were selecting and there's a selection, don't refocus
+        const selection = window.getSelection();
+        if (isSelecting && selection && selection.toString().length > 0) {
+          console.log('📋 Text selected, maintaining selection');
+        } else {
+          // Otherwise refocus the input
+          setTimeout(() => {
+            if (!document.activeElement || document.activeElement === document.body) {
+              userInput.focus();
+            }
+          }, 10);
+        }
+        isSelecting = false;
+      });
+
+      document.addEventListener('click', (e) => {
+        // Don't steal focus when clicking sidebar, buttons, or selecting text
+        if (!e.target.closest('#sidebar') && 
+            e.target.tagName !== 'BUTTON' &&
+            e.target !== terminal) {
+          userInput.focus();
+        }
+      });
+
+      // Refresh button
+      refreshBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log('🔄 Refresh clicked, relative path:', currentRelativePath);
+        loadFiles(currentRelativePath);
+      });
+
+      // Initialize
+      console.log('🏭 AgFactory Web UI Loading...');
+      connectWebSocket();
+      loadFiles();
+    </script>
+  </body>
+</html>
