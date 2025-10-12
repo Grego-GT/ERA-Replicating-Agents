@@ -1,3 +1,6 @@
+
+<img width="1024" height="1024" alt="era-logo" src="https://github.com/user-attachments/assets/ef2318fa-3f69-42ac-950b-c6765756cd51" />
+
 # ERA 🚀
 
 **Era of Rapid Agents** - Create AI agents with custom prompts using Deno.
