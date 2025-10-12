@@ -308,7 +308,7 @@
         </div>
 
         <div id="keyboard-hint">
-          💡 Press Enter to submit | Ctrl+C to interrupt | Ctrl+D to exit | Select text to copy
+          💡 Commands: cli, cd, ls, cat, pwd, deno, clear | Ctrl+C to interrupt | Select text to copy
         </div>
       </div>
     </div>
@@ -560,16 +560,24 @@
             if (message.type === 'output') {
               // Write output directly
               write(message.data);
-            } else if (message.type === 'exit') {
+            } else if (message.type === 'process_exit' || message.type === 'exit') {
+              // Process exited but socket stays alive!
               writeLine('');
-              writeLine(`⚠️  Process exited with code: ${message.code}`, '#f1fa8c');
+              if (message.code !== 0) {
+                writeLine(`⚠️  Process exited with code: ${message.code}`, '#f1fa8c');
+              }
+              writeLine('💡 Type a command: cli, cd agents, ls, deno run agents/<name>/index.ts', '#8be9fd');
               writeLine('');
-              writeLine('💡 Refresh the page to start a new session', '#8be9fd');
               // Refresh file list when process exits
               loadFiles(currentRelativePath);
+            } else if (message.type === 'clear') {
+              // Clear terminal
+              terminal.innerHTML = '';
             } else if (message.type === 'error') {
               writeLine('');
               writeLine(`❌ Error: ${message.message}`, '#ff5555');
+            } else if (message.type === 'connected') {
+              console.log('✅ Server confirmed connection');
             }
           } catch (error) {
             console.error('Error parsing message:', error);
@@ -646,15 +654,38 @@
         } else if (e.key === 'Enter') {
           // Enter - Send the whole line
           e.preventDefault();
-          const input = userInput.value;
+          const input = userInput.value.trim();
           userInput.value = '';
+          
+          if (!input) return;
           
           // Echo what was typed
           writeLine('$ ' + input, '#bd93f9');
           
-          // Send to server with newline
-          ws.send(JSON.stringify({ type: 'input', data: input + '\n' }));
-          console.log('📤 Sent:', input);
+          // Check if this is a command or input to running process
+          // If there's a running process, send as input
+          // Otherwise, treat as a new command
+          if (ws.readyState === WebSocket.OPEN) {
+            // Try to detect if it's a new command vs process input
+            // For simplicity, we'll send as command if it starts with known commands
+            const isCommand = input.startsWith('cli') || 
+                            input.startsWith('deno') || 
+                            input.startsWith('ls') || 
+                            input.startsWith('cat') ||
+                            input.startsWith('pwd') ||
+                            input.startsWith('cd') ||
+                            input === 'clear';
+            
+            if (isCommand) {
+              // Run as new command
+              ws.send(JSON.stringify({ type: 'run_command', command: input }));
+              console.log('📤 Sent command:', input);
+            } else {
+              // Send as input to running process
+              ws.send(JSON.stringify({ type: 'input', data: input + '\n' }));
+              console.log('📤 Sent input:', input);
+            }
+          }
           
           // Remove typing class after sending
           inputContainer.classList.remove('typing');

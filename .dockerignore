@@ -16,8 +16,8 @@ web/deno.lock
 dist
 web/dist
 
-# Agents (will be created at runtime)
-agents/*
+# Agents - uncomment to exclude (keeping agents for demos)
+# agents/*
 
 # OS files
 .DS_Store

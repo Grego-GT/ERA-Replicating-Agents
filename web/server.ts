@@ -81,6 +81,11 @@ function handleWebSocket(socket: WebSocket) {
   
   let currentProcess: Deno.ChildProcess | null = null;
   let processWriter: WritableStreamDefaultWriter<Uint8Array> | null = null;
+  
+  // Track current working directory for this session
+  let sessionCwd = isProduction 
+    ? join(Deno.cwd(), "..")  // /app in production
+    : join(Deno.cwd(), "..");  // Parent directory in development
 
   socket.onopen = () => {
     socket.send(JSON.stringify({ type: 'connected' }));
@@ -90,20 +95,31 @@ function handleWebSocket(socket: WebSocket) {
     try {
       const data = JSON.parse(event.data);
       
-      if (data.type === 'start_cli') {
-        // Start the CLI process
-        // In production (Fly.io), working dir is /app/web, parent is /app
-        // In development, working dir is web/, parent is AgFactory/
-        const cliPath = isProduction 
-          ? join(Deno.cwd(), "..", "cli.ts")  // /app/cli.ts in production
-          : join(Deno.cwd(), "..", "cli.ts");  // ../cli.ts in development
+      if (data.type === 'start_cli' || data.type === 'run_command') {
+        // Close existing process if any
+        if (currentProcess) {
+          try {
+            currentProcess.kill('SIGTERM');
+          } catch (e) {
+            console.log('Process already terminated:', e);
+          }
+          currentProcess = null;
+          processWriter = null;
+        }
         
-        const workingDir = isProduction 
+        // Determine command to run
+        let commandArgs: string[];
+        const baseDir = isProduction 
           ? join(Deno.cwd(), "..")  // /app in production
           : join(Deno.cwd(), "..");  // Parent directory in development
         
-        const command = new Deno.Command("deno", {
-          args: [
+        if (data.type === 'start_cli') {
+          // Start the CLI
+          const cliPath = isProduction 
+            ? join(Deno.cwd(), "..", "cli.ts")
+            : join(Deno.cwd(), "..", "cli.ts");
+          
+          commandArgs = [
             "run",
             "--allow-read",
             "--allow-write",
@@ -111,16 +127,136 @@ function handleWebSocket(socket: WebSocket) {
             "--allow-net",
             "--allow-sys",
             cliPath,
-          ],
+          ];
+        } else {
+          // Run arbitrary command
+          const cmd = data.command.trim();
+          
+          // Parse the command (simple split by spaces, doesn't handle quotes)
+          const parts = cmd.split(/\s+/);
+          
+          // Handle built-in commands
+          if (parts[0] === 'clear') {
+            socket.send(JSON.stringify({ type: 'clear' }));
+            return;
+          }
+          
+          if (parts[0] === 'cd') {
+            // Change directory
+            try {
+              const targetDir = parts[1] || baseDir;
+              const newPath = targetDir === '/' ? baseDir : 
+                             targetDir.startsWith('/') ? targetDir :
+                             join(sessionCwd, targetDir);
+              
+              // Resolve and validate path
+              const resolvedPath = await Deno.realPath(newPath).catch(() => null);
+              if (!resolvedPath) {
+                socket.send(JSON.stringify({ 
+                  type: 'output', 
+                  data: `cd: ${targetDir}: No such file or directory\n` 
+                }));
+                socket.send(JSON.stringify({ type: 'process_exit', code: 1 }));
+                return;
+              }
+              
+              // Security: ensure path is within base directory
+              if (!resolvedPath.startsWith(baseDir)) {
+                socket.send(JSON.stringify({ 
+                  type: 'output', 
+                  data: `cd: ${targetDir}: Permission denied\n` 
+                }));
+                socket.send(JSON.stringify({ type: 'process_exit', code: 1 }));
+                return;
+              }
+              
+              // Update session cwd
+              sessionCwd = resolvedPath;
+              socket.send(JSON.stringify({ 
+                type: 'output', 
+                data: `Changed directory to: ${sessionCwd}\n` 
+              }));
+              socket.send(JSON.stringify({ type: 'process_exit', code: 0 }));
+              return;
+            } catch (error) {
+              socket.send(JSON.stringify({ 
+                type: 'output', 
+                data: `cd: error: ${error.message}\n` 
+              }));
+              socket.send(JSON.stringify({ type: 'process_exit', code: 1 }));
+              return;
+            }
+          }
+          
+          if (parts[0] === 'cli') {
+            // Redirect to start_cli
+            socket.onmessage(new MessageEvent('message', { 
+              data: JSON.stringify({ type: 'start_cli' }) 
+            }));
+            return;
+          }
+          
+          // For deno commands, pass through
+          if (parts[0] === 'deno') {
+            commandArgs = parts.slice(1);
+          } else if (parts[0] === 'ls' || parts[0] === 'cat' || parts[0] === 'pwd') {
+            // Shell commands
+            commandArgs = ['-c', cmd];
+            const command = new Deno.Command('/bin/sh', {
+              args: commandArgs,
+              stdin: "piped",
+              stdout: "piped",
+              stderr: "piped",
+              cwd: sessionCwd,  // Use session's current directory
+            });
+            
+            currentProcess = command.spawn();
+            processWriter = currentProcess.stdin.getWriter();
+            
+            // Stream output
+            (async () => {
+              const decoder = new TextDecoder();
+              for await (const chunk of currentProcess!.stdout) {
+                socket.send(JSON.stringify({ type: 'output', data: decoder.decode(chunk) }));
+              }
+            })();
+            
+            (async () => {
+              const decoder = new TextDecoder();
+              for await (const chunk of currentProcess!.stderr) {
+                socket.send(JSON.stringify({ type: 'output', data: decoder.decode(chunk) }));
+              }
+            })();
+            
+            currentProcess.status.then((status) => {
+              socket.send(JSON.stringify({ 
+                type: 'process_exit', 
+                code: status.code 
+              }));
+              currentProcess = null;
+              processWriter = null;
+            });
+            return;
+          } else {
+            // Unknown command
+            socket.send(JSON.stringify({ 
+              type: 'output', 
+              data: `Command not found: ${parts[0]}\nTry: cli, deno, ls, cat, pwd, cd, clear\n` 
+            }));
+            socket.send(JSON.stringify({ type: 'process_exit', code: 127 }));
+            return;
+          }
+        }
+
+        const command = new Deno.Command("deno", {
+          args: commandArgs,
           stdin: "piped",
           stdout: "piped",
           stderr: "piped",
-          cwd: workingDir,
+          cwd: sessionCwd,  // Use session's current directory
         });
 
         currentProcess = command.spawn();
-        
-        // Get writer for stdin
         processWriter = currentProcess.stdin.getWriter();
 
         // Stream stdout
@@ -141,10 +277,10 @@ function handleWebSocket(socket: WebSocket) {
           }
         })();
 
-        // Handle process exit
+        // Handle process exit - Keep socket alive!
         currentProcess.status.then((status) => {
           socket.send(JSON.stringify({ 
-            type: 'exit', 
+            type: 'process_exit', 
             code: status.code 
           }));
           currentProcess = null;
@@ -212,12 +348,12 @@ async function handler(req: Request): Promise<Response> {
 
     // File explorer API
     if (pathname === "/api/files") {
-      // In production, only allow viewing the web directory
       const searchParams = url.searchParams;
       const requestedPath = searchParams.get("path") || ".";
       
       try {
-        const basePath = isProduction ? Deno.cwd() : join(Deno.cwd(), "..");
+        // Both dev and prod: show parent directory (/app or AgFactory/)
+        const basePath = join(Deno.cwd(), "..");
         const targetPath = requestedPath === "." || requestedPath === ".." 
           ? basePath 
           : join(basePath, requestedPath);

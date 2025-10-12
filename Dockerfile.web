@@ -11,14 +11,17 @@ COPY history.ts ./history.ts
 COPY backend ./backend
 COPY deno.json ./deno.json
 
+# Copy existing agents directory
+COPY agents ./agents
+
+# Ensure agents directory exists with proper permissions
+RUN mkdir -p /app/agents && chmod -R 755 /app/agents
+
 # Set working directory to web
 WORKDIR /app/web
 
 # Cache dependencies
 RUN deno cache server.ts ../cli.ts
-
-# Create agents directory
-RUN mkdir -p /app/agents
 
 # Expose port
 EXPOSE 8080
