@@ -1,5 +1,5 @@
 {
-  "name": "AgFactory",
+  "name": "ERA",
   "version": "1.0.0",
   "description": "Agentic agent factory - create agents with prompts. Includes Hono server and CLI.",
   "exports": {
@@ -17,7 +17,7 @@
     "dev": "deno run --allow-net --allow-read --allow-env --allow-sys --watch main.ts",
     "serve": "deno serve --port 9995 --watch --allow-read --allow-env --allow-write --allow-net --allow-sys --allow-import ./main.ts",
     "git": "git add . && git commit -m 'bump' && git push origin main",
-    "prod": "deployctl deploy --prod --project=agfactory",
+    "prod": "deployctl deploy --prod --project=era",
     "test:wandb": "deno run --allow-net --allow-env --allow-sys backend/wandb.ts",
     "test:daytona": "deno run --allow-net --allow-env --allow-sys backend/daytona.ts",
     "test:director": "deno run --allow-net --allow-read --allow-env --allow-sys backend/director.ts",
@@ -81,4 +81,3 @@
     "entrypoint": "core/main.ts"
   }
 }
-

@@ -1,16 +1,16 @@
 #!/usr/bin/env -S deno run --allow-net --allow-env
 /**
  * Test Script: Weave Integration with Wandb Inference
- * 
+ *
  * This script verifies that Weave tracing is properly integrated
  * with all Wandb chat functions.
- * 
+ *
  * Run: deno run --allow-net --allow-env test-weave-integration.ts
  */
 
-import * as weave from "./weave.ts";
-import { chat, simpleChat, chatWithHistory } from "./wandb.ts";
-import type { ChatMessage } from "./wandb.ts";
+import * as weave from './weave.ts';
+import { chat, simpleChat, chatWithHistory } from './wandb.ts';
+import type { ChatMessage } from './wandb.ts';
 
 console.log('🧪 Testing Weave Integration with Wandb Inference\n');
 
@@ -42,10 +42,8 @@ console.log('Test 3: Chat with Options and Tracing');
 try {
   const response = await chat({
     systemPrompt: 'You are a test assistant. Respond concisely.',
-    messages: [
-      { role: 'user', content: 'What is 2+2?' }
-    ],
-    temperature: 0.1
+    messages: [{ role: 'user', content: 'What is 2+2?' }],
+    temperature: 0.1,
   });
   console.log('Response:', response.choices[0].message.content.substring(0, 50));
   console.log('✅ Chat with options traced successfully\n');
@@ -59,11 +57,11 @@ try {
 console.log('Test 4: Conversation History with Tracing');
 try {
   let history: ChatMessage[] = [];
-  
+
   const turn1 = await chatWithHistory(history, 'Remember this number: 42');
   history = turn1.updatedHistory;
   console.log('Turn 1 completed');
-  
+
   const turn2 = await chatWithHistory(history, 'What number should you remember?');
   console.log('Turn 2 response:', turn2.assistantMessage.content.substring(0, 50));
   console.log('✅ Conversation history traced successfully\n');
@@ -80,7 +78,7 @@ try {
     const response = await simpleChat(`Echo this: ${input}`);
     return { original: input, echo: response };
   }
-  
+
   const tracedCustom = weave.op(customFunction);
   const result = await tracedCustom('test-input');
   console.log('Original:', result.original);
@@ -110,7 +108,7 @@ console.log('✅ ALL TESTS PASSED!');
 console.log('='.repeat(50));
 console.log('\n📊 Check your Weave dashboard:');
 console.log(`   https://wandb.ai/`);
-console.log(`   Project: agfactory`);
+console.log(`   Project: era`);
 console.log('\n🔍 You should see traces for:');
 console.log('   - simpleChat');
 console.log('   - chat');
@@ -123,4 +121,3 @@ console.log('   • Execution time');
 console.log('   • Token usage (where applicable)');
 console.log('   • Any errors or exceptions');
 console.log('\n✨ Weave integration is working correctly!\n');
-
