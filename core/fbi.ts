@@ -19,6 +19,7 @@ import { runCode, type CodeRunResponse } from '../utils/daytona/index.ts';
 import * as weave from '../utils/weave/index.ts';
 import { improvePromptWithAI, getDirectorVerdict, generateAgentDescription, type PromptImprovementResult, type DirectorVerdict } from './director.ts';
 import type { AgentCreationHistory, GenerationAttempt, ExecutionResult as SessionExecutionResult, AgentFiles } from '../history.ts';
+import { injectUtilities } from '../utils/registry/index.ts';
 
 // ============================================================================
 // Type Definitions
@@ -294,6 +295,7 @@ async function agentExecuteCode(
   language: string
 ): Promise<ExecutionResult> {
   try {
+    // Code already has utilities injected at the orchestrator level
     const response = await runCode(code, language);
     return analyzeExecutionOutput(response);
   } catch (error) {
@@ -539,14 +541,20 @@ async function dispatchAgents(
         iteration
       });
       
-      // Store the generated code in session data
-      sessionData.finalCode = generation.code;
+      // Inject utilities (wandb, weave) into generated code before execution
+      const codeWithUtils = await injectUtilities(generation.code, ['wandb', 'weave']);
       
-      // Step 2: Execute code
+      // Store the injected code in session data (this is what gets saved to disk)
+      sessionData.finalCode = codeWithUtils;
+      
+      // Update the generation object to include injected code
+      generation.code = codeWithUtils;
+      
+      // Step 2: Execute code (now with injected utilities)
       log('Executing code in Daytona sandbox...', 'info');
       const execStartTime = Date.now();
       
-      const execution = await executeCodeInSandbox(generation.code, language);
+      const execution = await executeCodeInSandbox(codeWithUtils, language);
       const execDuration = Date.now() - execStartTime;
       totalExecDuration += execDuration;
       

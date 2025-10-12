@@ -14,6 +14,7 @@
 import "jsr:@std/dotenv/load"; // needed for deno run; not req for smallweb or valtown
 import { chat, type ChatMessage } from '../utils/wandb/index.ts';
 import * as weave from '../utils/weave/index.ts';
+import { generateUtilityPrompt } from '../utils/registry/index.ts';
 
 // ============================================================================
 // Type Definitions
@@ -232,6 +233,18 @@ If previous execution failed, focus on:
 - Mention relevant patterns or best practices
 - If refining, explicitly address previous errors
 
+## Tracing and Observability:
+When the user asks for "tracing", "observability", or "weave":
+- Automatically use the agent name as the namespace prefix
+- Format: "{agent-name}:{operation-name}"
+- Example: For agent "jokemeister", use operations like:
+  - "jokemeister:tell_joke"
+  - "jokemeister:fetch_joke"
+  - "jokemeister:generate_response"
+- Make operation names descriptive of what they do
+- Multiple operations = multiple namespaced traces
+- DON'T make the user specify the namespace - infer it from agent name!
+
 ## Output Format:
 You MUST respond with ONLY a JSON object (no markdown, no code blocks, just raw JSON):
 
@@ -278,6 +291,9 @@ async function improvePrompt(
     const isRefinement = !!previousAttempt;
     console.log(isRefinement ? '🔄 FBI Director refining prompt based on previous attempt...' : '🎯 FBI Director analyzing prompt...');
 
+    // Get available utilities for context
+    const utilityDocs = await generateUtilityPrompt(true);
+
     // Build the user message with all context
     let userMessage = `Original Prompt:\n${userPrompt}\n\n`;
     
@@ -286,6 +302,10 @@ async function improvePrompt(
     }
     
     userMessage += `Target Language: ${language}\n`;
+    
+    // Add utility context
+    userMessage += `\n${utilityDocs}\n\n`;
+    userMessage += `IMPORTANT: The above utilities are PRE-LOADED. Tell the code generator to USE them, not reimplement them!\n`;
     
     if (systemPrompt) {
       userMessage += `\nSystem Prompt Context:\n${systemPrompt}\n`;

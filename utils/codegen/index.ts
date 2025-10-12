@@ -9,6 +9,7 @@ import "jsr:@std/dotenv/load"; // needed for deno run; not req for smallweb or v
 import { runCode } from '../daytona/index.ts';
 import { chat } from '../wandb/index.ts';
 import * as weave from '../weave/index.ts';
+import { generateUtilityPrompt } from '../registry/index.ts';
 
 // ============================================================================
 // Type Definitions
@@ -147,15 +148,59 @@ export async function generateCode(
   maxRetries: number = 3, 
   model: string = "Qwen/Qwen3-Coder-480B-A35B-Instruct"
 ): Promise<GeneratedCodeResult> {
+  // Get available utilities dynamically
+  const utilityDocs = await generateUtilityPrompt(true);
+  
   const systemPrompt = `You are a code generation assistant. Generate TypeScript/JavaScript code based on user requests.
 
-CRITICAL: Your code will be executed in a TypeScript sandbox. It MUST be valid TypeScript and produce reliable output.
+${utilityDocs}
+
+NOTE: The utilities above are PRE-LOADED and available in your environment. You can call them directly without installing or defining them!
+
+---
+
+CRITICAL: Your code will be executed in a Node.js v24 sandbox (Daytona). It MUST be valid code and produce reliable output.
 
 MANDATORY REQUIREMENTS:
 1. Wrap ALL code in <code></code> tags
-2. Use ONLY standard JavaScript/TypeScript - no external imports or Node.js modules
+2. Code will run in Node.js with CommonJS support
 3. MUST include proper TypeScript error handling
 4. Output results using console.log() - structured JSON is recommended but not required
+5. You CAN use npm packages! (See NPM Package Usage section below)
+
+NPM PACKAGE USAGE:
+You can install and use npm packages! Here's how:
+
+<code>
+(async () => {
+  const { execSync } = require('child_process');
+  
+  // Install packages (use stdio: 'pipe' to suppress output)
+  execSync('npm install lodash moment axios', { stdio: 'pipe' });
+  
+  // Require and use them
+  const _ = require('lodash');
+  const moment = require('moment');
+  const axios = require('axios');
+  
+  // Use the packages
+  const sum = _.sum([1, 2, 3, 4, 5]);
+  const now = moment().format('YYYY-MM-DD HH:mm:ss');
+  
+  console.log(JSON.stringify({
+    success: true,
+    sum: sum,
+    timestamp: now
+  }));
+})();
+</code>
+
+IMPORTANT NPM NOTES:
+- Always wrap code in (async () => { ... })() for require() support
+- Install packages BEFORE requiring them
+- Use { stdio: 'pipe' } to suppress npm install output
+- Packages don't persist - install each time the code runs
+- Common packages: lodash, moment, axios, uuid, date-fns, etc.
 
 REQUIRED ERROR HANDLING PATTERN:
 Always wrap your code in a try-catch block with proper TypeScript error typing:
@@ -200,6 +245,64 @@ try {
 }
 </code>
 
+✅ CORRECT - Using npm package (lodash):
+<code>
+(async () => {
+  const { execSync } = require('child_process');
+  execSync('npm install lodash', { stdio: 'pipe' });
+  const _ = require('lodash');
+  
+  try {
+    const numbers = [1, 2, 3, 4, 5];
+    const sum = _.sum(numbers);
+    const avg = _.mean(numbers);
+    const shuffled = _.shuffle(numbers);
+    
+    console.log(JSON.stringify({ 
+      success: true, 
+      sum, 
+      average: avg,
+      shuffled 
+    }));
+  } catch (error: unknown) {
+    const err = error as Error;
+    console.log(JSON.stringify({ success: false, error: err.message }));
+  }
+})();
+</code>
+
+✅ CORRECT - Multiple npm packages (moment + axios):
+<code>
+(async () => {
+  const { execSync } = require('child_process');
+  execSync('npm install moment axios', { stdio: 'pipe' });
+  const moment = require('moment');
+  const axios = require('axios');
+  
+  try {
+    // Format current date/time
+    const now = moment().format('YYYY-MM-DD HH:mm:ss');
+    const relative = moment().subtract(5, 'days').fromNow();
+    
+    // Make HTTP request
+    const response = await axios.get('https://api.github.com/users/github');
+    
+    console.log(JSON.stringify({ 
+      success: true, 
+      timestamp: now,
+      relative: relative,
+      github: {
+        name: response.data.name,
+        followers: response.data.followers
+      }
+    }));
+  } catch (error: unknown) {
+    const err = error as Error;
+    console.log(JSON.stringify({ success: false, error: err.message }));
+  }
+})();
+</code>
+
 ✅ ALSO CORRECT - Plain text output (when appropriate):
 <code>
 try {
@@ -235,14 +338,29 @@ catch (error) { // This will fail TypeScript compilation!
 const result = calculate(); // No console.log!
 </code>
 
+❌ WRONG - Requiring before installing:
+<code>
+const _ = require('lodash'); // Will fail - not installed yet!
+execSync('npm install lodash');
+</code>
+
+❌ WRONG - Forgetting IIFE wrapper for require():
+<code>
+const { execSync } = require('child_process'); // Will fail in Node.js v24!
+execSync('npm install lodash');
+// MUST wrap in (async () => { ... })()
+</code>
+
 REMEMBER:
 - Every catch block MUST type error as "error: unknown"
 - Every error MUST be cast: "const err = error as Error"
 - Always produce SOME output so we can verify execution
 - Use JSON for structured data, plain text for simple outputs
 - Test your logic mentally before outputting
+- For npm packages: (async () => { ... })() wrapper + install BEFORE require
+- Common packages available: lodash, moment, axios, uuid, date-fns, ramda, etc.
 
-Generate clean, TypeScript-compliant code that will execute without errors.`;
+Generate clean, Node.js-compliant code that will execute without errors.`;
 
   let lastResponse: string | null = null;
   let attempts = 0;

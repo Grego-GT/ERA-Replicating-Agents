@@ -30,6 +30,13 @@
     "test:prep": "deno run --allow-net --allow-read --allow-write --allow-env --allow-sys tests/test-prep-integration.ts",
     "test": "deno run --allow-net --allow-read --allow-env --allow-sys core/fbi.ts",
     "test:weave": "deno run --allow-net --allow-read --allow-env --allow-sys tests/test-weave-integration.ts",
+    "test:wandb-injection": "deno run --allow-net --allow-read --allow-env --allow-sys tests/test-wandb-injection.ts",
+    "test:weave-injection": "deno run --allow-net --allow-read --allow-env --allow-sys tests/test-weave-injection.ts",
+    "test:agent-utils": "deno run --allow-net --allow-read --allow-env --allow-sys tests/test-agent-with-utils.ts",
+    "test:registry": "deno run --allow-read --allow-env utils/registry/index.ts",
+    "test:npm-codegen": "deno run --allow-net --allow-read --allow-env --allow-sys tests/test-npm-codegen.ts",
+    "test:e2e-agent": "deno run --allow-net --allow-read --allow-write --allow-env --allow-sys tests/test-e2e-agent-creation.ts",
+    "test:jokemeister": "deno run --allow-read --allow-env tests/test-simple-jokemeister.ts",
     "demo:daytona": "deno run --allow-net --allow-read --allow-env --allow-sys tests/daytona/demo.ts"
   },
   "$schema": "https://raw.githubusercontent.com/denoland/deno/348900b8b79f4a434cab4c74b3bc8d4d2fa8ee74/cli/schemas/config-file.v1.json",

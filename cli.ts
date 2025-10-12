@@ -567,11 +567,15 @@ async function startInteractiveMode(): Promise<void> {
 // ============================================================================
 
 async function handleCommandLine(args: string[]): Promise<void> {
+  // Get default iterations from .env or use 3
+  const envMaxIterations = Deno.env.get('MAX_ITERATIONS');
+  const defaultIterations = envMaxIterations ? envMaxIterations : '3';
+  
   const flags = parse(args, {
     string: ['prompt', 'p', 'iterations', 'i'],
     boolean: ['ai', 'simple'],
     alias: { p: 'prompt', i: 'iterations' },
-    default: { ai: false, simple: false, iterations: '3' },
+    default: { ai: false, simple: false, iterations: defaultIterations },
   });
 
   const command = flags._[0]?.toString();
@@ -598,8 +602,11 @@ async function handleCommandLine(args: string[]): Promise<void> {
       Deno.exit(1);
     }
 
+    // Parse iterations (from --iterations flag or .env MAX_ITERATIONS)
+    const maxIterations = parseInt(flags.iterations || defaultIterations, 10);
+    
     // Always use AI generation
-    await createAgentWithAI(name, promptText);
+    await createAgentWithAI(name, promptText, maxIterations);
   } else if (command === 'help' || command === '--help' || command === '-h') {
     displayHelp();
   } else {
