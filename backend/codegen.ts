@@ -153,10 +153,9 @@ CRITICAL: Your code will be executed in a TypeScript sandbox. It MUST be valid T
 
 MANDATORY REQUIREMENTS:
 1. Wrap ALL code in <code></code> tags
-2. ALWAYS output results using console.log() with structured JSON
-3. Use ONLY standard JavaScript/TypeScript - no external imports or Node.js modules
-4. MUST include proper TypeScript error handling
-5. Output format MUST be valid JSON
+2. Use ONLY standard JavaScript/TypeScript - no external imports or Node.js modules
+3. MUST include proper TypeScript error handling
+4. Output results using console.log() - structured JSON is recommended but not required
 
 REQUIRED ERROR HANDLING PATTERN:
 Always wrap your code in a try-catch block with proper TypeScript error typing:
@@ -166,7 +165,7 @@ try {
   // Your code here
   const result = yourLogic();
   
-  // REQUIRED: Always output as JSON
+  // Output the result (JSON recommended for structured data)
   console.log(JSON.stringify({
     success: true,
     result: result,
@@ -186,7 +185,7 @@ try {
 
 EXAMPLES OF VALID OUTPUT:
 
-✅ CORRECT - Math operation:
+✅ CORRECT - Structured JSON output (recommended):
 <code>
 try {
   const factorial = (n: number): number => {
@@ -201,14 +200,28 @@ try {
 }
 </code>
 
-✅ CORRECT - Data manipulation:
+✅ ALSO CORRECT - Plain text output (when appropriate):
 <code>
 try {
-  const data = { name: "John", age: 30, email: "john@example.com" };
-  console.log(JSON.stringify({ success: true, result: data, timestamp: new Date().toISOString() }));
+  const text = "hello world";
+  const reversed = text.split('').reverse().join('');
+  console.log(reversed); // Simple output is fine
 } catch (error: unknown) {
   const err = error as Error;
-  console.log(JSON.stringify({ success: false, error: err.message, timestamp: new Date().toISOString() }));
+  console.log(\`Error: \${err.message}\`);
+}
+</code>
+
+✅ ALSO CORRECT - Multiple operations:
+<code>
+try {
+  const items = [1, 2, 3, 4, 5];
+  console.log('Processing items...');
+  items.forEach(item => console.log(\`Item: \${item}\`));
+  console.log('Done!');
+} catch (error: unknown) {
+  const err = error as Error;
+  console.log(\`Error: \${err.message}\`);
 }
 </code>
 
@@ -217,18 +230,16 @@ catch (error) { // This will fail TypeScript compilation!
   console.log(error.message);
 }
 
-❌ WRONG - No structured output:
-console.log("The result is: " + result); // Not JSON!
-
-❌ WRONG - Multiple console.logs without JSON:
-console.log(result);
-console.log(timestamp);
+❌ WRONG - No output at all:
+<code>
+const result = calculate(); // No console.log!
+</code>
 
 REMEMBER:
-- Every output MUST be JSON with success/result/error/timestamp
 - Every catch block MUST type error as "error: unknown"
 - Every error MUST be cast: "const err = error as Error"
-- No plain text outputs - only JSON
+- Always produce SOME output so we can verify execution
+- Use JSON for structured data, plain text for simple outputs
 - Test your logic mentally before outputting
 
 Generate clean, TypeScript-compliant code that will execute without errors.`;

@@ -8,16 +8,56 @@ The FBI orchestrator is the core workflow engine that coordinates AI agent creat
 
 ## Key Features
 
+- **Prompt Improvement**: FBI Director reviews and enhances prompts before code generation
 - **Atomic Operations**: Keeps code generation, execution, and chat functions separate
 - **Weave Tracing**: Full observability of all operations via Wandb Weave
 - **History Tracking**: Comprehensive session metadata using `AgentCreationHistory` data model
 - **Error Handling**: Tracks Daytona errors, compilation errors, and runtime errors
 - **Session Management**: Each agent creation is a unique session with version ID
 
+## FBI Director (Prompt Strategist) 🎯
+
+The FBI Director is the first step in the workflow, responsible for reviewing and improving user prompts before they reach code generation.
+
+### Current Status
+**Fully implemented** using AI-powered prompt improvement! The Director uses the Qwen coder model to analyze and enhance prompts.
+
+### Capabilities
+The Director:
+- ✅ Analyzes prompt quality and clarity using AI
+- ✅ Adds context and specificity to vague prompts
+- ✅ Includes code examples and patterns when helpful
+- ✅ Applies best practices for code generation
+- ✅ Considers system prompts and judging criteria
+- ✅ Provides detailed analysis of improvements made
+- ✅ Falls back gracefully if improvement fails
+
+### How It Works
+1. Takes the user's prompt and context (language, agent name, criteria)
+2. Sends it to the Qwen coder model with a specialized system prompt
+3. Receives an enhanced prompt with specific requirements, examples, and constraints
+4. Returns both original and improved versions with detailed improvement list
+
+### Example
+**Before:** "Create a factorial function"
+
+**After:** "Create a TypeScript function that calculates factorial with input validation, error handling for negative numbers, iterative implementation, example usage, and test cases for edge cases..."
+
+### Tracing
+All Director operations are traced through Weave as `improvePromptWithAI`, allowing you to:
+- Monitor prompt transformations in real-time
+- Compare original vs improved prompts
+- Track which improvements lead to better code
+- Analyze the Director's decision-making process
+
+See [DIRECTOR_README.md](./DIRECTOR_README.md) for detailed documentation.
+
 ## Architecture
 
 ```
 FBI Field Office: Agent Dispatch 🕵️
+    ├── FBI Director: Prompt Strategist 🎯
+    │   └── Reviews and improves user prompts
     ├── Agent: Code Generator 🤖 (Wandb Inference API)
     │   └── Track attempts in session data
     ├── Agent: Code Executor 🔬 (Daytona Sandbox)
@@ -27,6 +67,7 @@ FBI Field Office: Agent Dispatch 🕵️
 
 Think of it like an FBI operation:
 - **Field Office** = The orchestrator that coordinates everything
+- **Director** = Reviews and strategizes prompts before agent deployment
 - **Agents** = Specialized units (Code Generator, Code Executor)
 - **Case File** = Session data (AgentCreationHistory)
 - **Evidence** = All traces in Weave
@@ -161,21 +202,25 @@ All errors are captured in the session data (`AgentCreationHistory`) and traced 
 Every operation is wrapped with `weave.op()` for automatic tracing, and session data is logged at key points for analysis:
 
 ### Traced Operations (FBI Agents)
+- `directorImprovePrompt`: FBI Director that reviews and improves prompts
 - `agentGenerateCode`: FBI Agent that interrogates AI to generate code
 - `agentExecuteCode`: FBI Agent that runs code in secure sandbox
 - `dispatchAgents`: FBI Field Office that coordinates all agents
 
 These show up in your Weave dashboard as:
+- `improvePromptWithDirector` 🎯
 - `generateCodeWithAgent` 🤖
 - `executeCodeInSandbox` 🔬
-- `orchestrate` (dispatchAgents) 🎯
+- `orchestrate` (dispatchAgents) 🕵️
 
 ### Logged Events (visible in Weave)
-1. **Generation Attempt Recorded**: After each code generation attempt
+1. **Prompt Review**: After FBI Director reviews the prompt
+   - Original and improved prompt lengths, improvements applied, duration
+2. **Generation Attempt Recorded**: After each code generation attempt
    - Attempt number, success status, code presence, version ID
-2. **Execution Result Recorded**: After code execution
+3. **Execution Result Recorded**: After code execution
    - Success status, output presence, error type, version ID
-3. **Session Data Summary**: At completion
+4. **Session Data Summary**: At completion
    - Version ID, agent name, total attempts, code length, execution status, overall success
 
 ### What Gets Traced
@@ -203,6 +248,12 @@ Since all session data is traced, you can:
 {
   success: true,
   prompt: "Create a factorial function",
+  promptImprovement: {
+    success: true,
+    originalPrompt: "Create a factorial function",
+    improvedPrompt: "Create a factorial function",
+    improvements: []
+  },
   generation: {
     success: true,
     code: "...",
@@ -230,9 +281,10 @@ Since all session data is traced, you can:
     }
   },
   duration: {
+    director: 50,
     generation: 2500,
     execution: 1200,
-    total: 3700
+    total: 3750
   }
 }
 ```

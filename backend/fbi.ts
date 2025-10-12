@@ -3,6 +3,7 @@
  * (FBI = "Federal Bureau of Intelligence" - a joke because these are "agents" 🕵️)
  * 
  * This module orchestrates the complete workflow of:
+ * 0. FBI Director reviews and improves user prompts
  * 1. Taking user prompts
  * 2. Generating code via AI
  * 3. Executing code in sandbox
@@ -16,6 +17,7 @@ import "jsr:@std/dotenv/load"; // needed for deno run; not req for smallweb or v
 import { generateCode } from './codegen.ts';
 import { runCode, type CodeRunResponse } from './daytona.ts';
 import * as weave from './weave.ts';
+import { improvePromptWithAI, getDirectorVerdict, type PromptImprovementResult, type DirectorVerdict } from './director.ts';
 import type { AgentCreationHistory, GenerationAttempt, ExecutionResult as SessionExecutionResult, AgentFiles } from '../history.ts';
 
 // ============================================================================
@@ -73,6 +75,7 @@ interface ExecutionResult {
  */
 export interface OrchestratorOptions {
   maxRetries?: number;
+  maxIterations?: number; // Max retry iterations for full generation+execution loop
   language?: string;
   model?: string;
   logCallback?: ((log: LogEntry) => void) | null;
@@ -87,10 +90,12 @@ export interface OrchestratorOptions {
 export interface OrchestratorResult {
   success: boolean;
   prompt: string;
+  promptImprovement?: PromptImprovementResult;
   generation: GenerationResult;
   execution: ExecutionResult;
   logs: LogEntry[];
   duration: {
+    director: number;
     generation: number;
     execution: number;
     total: number;
@@ -120,6 +125,14 @@ function createLog(
 
 /**
  * Analyze execution output for errors
+ * 
+ * Intelligently assesses both JSON and plain text outputs:
+ * - If JSON with {"success": false}, treats as runtime error
+ * - If contains compilation/syntax errors, treats as compilation error
+ * - If Daytona errors, treats as sandbox error
+ * - Otherwise, lets Director assess if output meets user intent (plain text or JSON)
+ * 
+ * Note: Empty/null output is not automatically an error - Director will judge based on context
  */
 function analyzeExecutionOutput(response: CodeRunResponse): ExecutionResult {
   const output = response.result || '';
@@ -134,7 +147,8 @@ function analyzeExecutionOutput(response: CodeRunResponse): ExecutionResult {
                              output.includes('SyntaxError:') ||
                              output.includes('Cannot find name');
   
-  // Try to parse JSON output to check for runtime errors
+  // Try to parse JSON output to check for runtime errors (if JSON is used)
+  // But JSON is optional - plain text outputs are also valid
   let parsedOutput: ParsedExecutionOutput | null = null;
   let hasRuntimeError = false;
   
@@ -147,6 +161,7 @@ function analyzeExecutionOutput(response: CodeRunResponse): ExecutionResult {
         if (line.trim().startsWith('{')) {
           try {
             parsedOutput = JSON.parse(line) as ParsedExecutionOutput;
+            // Only treat as error if JSON explicitly has success: false
             hasRuntimeError = parsedOutput.success === false;
             break;
           } catch {
@@ -156,7 +171,7 @@ function analyzeExecutionOutput(response: CodeRunResponse): ExecutionResult {
       }
     }
   } catch (e) {
-    // Not JSON or invalid JSON, that's okay
+    // Not JSON or invalid JSON - that's okay, plain text is valid too
   }
   
   const hasError = isDaytonaError || isCompilationError || hasRuntimeError;
@@ -193,6 +208,48 @@ function analyzeExecutionOutput(response: CodeRunResponse): ExecutionResult {
 // ============================================================================
 
 /**
+ * FBI Director: Prompt Strategist 🎯
+ * Reviews and improves user prompts before sending to code generation
+ * 
+ * Uses AI to:
+ * - Analyze prompt quality and clarity
+ * - Add context and specificity
+ * - Include examples and constraints
+ * - Apply best practices for code generation
+ * - Incorporate system prompt and judging criteria
+ */
+async function directorImprovePrompt(
+  userPrompt: string,
+  options?: {
+    agentName?: string;
+    systemPrompt?: string;
+    judgingCriteria?: string;
+    language?: string;
+    previousAttempt?: {
+      prompt?: string;
+      code?: string;
+      executionOutput?: string;
+      executionError?: string;
+      errorType?: string;
+    };
+  }
+): Promise<PromptImprovementResult> {
+  // Use the AI-powered prompt improvement from director.ts
+  return await improvePromptWithAI(userPrompt, {
+    agentName: options?.agentName,
+    systemPrompt: options?.systemPrompt,
+    judgingCriteria: options?.judgingCriteria,
+    language: options?.language || 'typescript',
+    previousAttempt: options?.previousAttempt
+  });
+}
+
+/**
+ * FBI Director Prompt Strategist (tracing handled at orchestrator level)
+ */
+const improvePromptWithDirector = directorImprovePrompt;
+
+/**
  * FBI Agent: Code Generator 🤖
  * Interrogates the AI to generate code from user prompts
  */
@@ -224,9 +281,9 @@ async function agentGenerateCode(
 }
 
 /**
- * Traced: FBI Agent Code Generator
+ * FBI Agent Code Generator (tracing handled at orchestrator level)
  */
-const generateCodeWithAgent = weave.op(agentGenerateCode);
+const generateCodeWithAgent = agentGenerateCode;
 
 /**
  * FBI Agent: Code Executor 🔬
@@ -254,9 +311,9 @@ async function agentExecuteCode(
 }
 
 /**
- * Traced: FBI Agent Code Executor
+ * FBI Agent Code Executor (tracing handled at orchestrator level)
  */
-const executeCodeInSandbox = weave.op(agentExecuteCode);
+const executeCodeInSandbox = agentExecuteCode;
 
 /**
  * Generate a unique version ID for this agent creation session
@@ -270,14 +327,15 @@ function generateVersionID(): string {
 /**
  * FBI Field Office: Agent Dispatch 🕵️
  * The main case handler that coordinates all field agents
- * (Generates code, executes it, builds the case file)
+ * (Director reviews prompt, generates code, executes it, builds the case file)
  */
 async function dispatchAgents(
   userPrompt: string,
   options: OrchestratorOptions = {}
 ): Promise<OrchestratorResult> {
   const {
-    maxRetries = 3,
+    maxRetries = 3, // Retries for code generation extraction
+    maxIterations = 3, // Full refinement iterations (director -> generate -> execute)
     language = 'typescript',
     model = "Qwen/Qwen3-Coder-480B-A35B-Instruct",
     logCallback = null,
@@ -334,123 +392,263 @@ async function dispatchAgents(
       model,
       language,
       maxRetries,
+      maxIterations,
       versionID 
     });
     
-    // Step 1: Generate code
-    log('Generating code from prompt...', 'info');
-    const genStartTime = Date.now();
+    // Track all iterations
+    let totalDirectorDuration = 0;
+    let totalGenDuration = 0;
+    let totalExecDuration = 0;
     
-    const generation = await generateCodeWithAgent(userPrompt, maxRetries, model);
-    const genDuration = Date.now() - genStartTime;
+    let lastPromptImprovement: PromptImprovementResult | undefined;
+    let lastGeneration: GenerationResult | undefined;
+    let lastExecution: ExecutionResult | undefined;
     
-    // Record generation attempt in session data
-    const genAttempt: GenerationAttempt = {
-      attemptNumber: generation.attempts,
-      timestamp: new Date().toISOString(),
-      extractionSuccess: generation.success,
-      rawResponse: generation.rawResponse,
-      extractedCode: generation.code,
-      error: generation.error,
-      prompt: userPrompt
-    };
-    sessionData.attempts?.push(genAttempt);
+    // Main refinement loop
+    for (let iteration = 1; iteration <= maxIterations; iteration++) {
+      const isFirstIteration = iteration === 1;
+      const isLastIteration = iteration === maxIterations;
+      
+      log(`\n${'='.repeat(60)}`, 'info');
+      log(`📍 Iteration ${iteration}/${maxIterations}`, 'info', { iteration, maxIterations });
+      log(`${'='.repeat(60)}\n`, 'info');
+      
+      // Step 0: FBI Director reviews/refines the prompt
+      log(`FBI Director ${isFirstIteration ? 'reviewing' : 'refining'} prompt...`, 'info');
+      const directorStartTime = Date.now();
+      
+      const promptImprovement = await improvePromptWithDirector(userPrompt, {
+        agentName,
+        systemPrompt,
+        judgingCriteria,
+        language,
+        // Pass previous attempt info for refinement (if not first iteration)
+        previousAttempt: !isFirstIteration && lastExecution && lastGeneration ? {
+          prompt: lastPromptImprovement?.improvedPrompt,
+          code: lastGeneration.code,
+          executionOutput: lastExecution.output,
+          executionError: lastExecution.errorMessage,
+          errorType: lastExecution.errorType || undefined
+        } : undefined
+      });
+      const directorDuration = Date.now() - directorStartTime;
+      totalDirectorDuration += directorDuration;
     
-    // Log attempt to Weave for tracking
-    log('Generation attempt recorded', 'info', {
-      attemptNumber: genAttempt.attemptNumber,
-      extractionSuccess: genAttempt.extractionSuccess,
-      hasCode: !!genAttempt.extractedCode,
-      versionID: sessionData.versionID
-    });
-    
-    if (!generation.success) {
-      log('Code generation failed', 'error', { 
+      if (!promptImprovement.success) {
+        log('Prompt improvement failed, using original prompt', 'warning', {
+          error: promptImprovement.error,
+          iteration
+        });
+      } else {
+        log(`FBI Director ${isFirstIteration ? 'reviewed' : 'refined'} prompt`, 'success', {
+          originalLength: promptImprovement.originalPrompt.length,
+          improvedLength: promptImprovement.improvedPrompt.length,
+          hasImprovements: promptImprovement.improvements && promptImprovement.improvements.length > 0,
+          hasRecommendation: !!promptImprovement.recommendation,
+          duration: directorDuration,
+          iteration
+        });
+        
+        if (promptImprovement.recommendation) {
+          log(`💡 Director Recommendation: ${promptImprovement.recommendation.substring(0, 150)}...`, 'info');
+        }
+      }
+      
+      // Use the improved prompt (or original if improvement failed)
+      const finalPrompt = promptImprovement.success ? promptImprovement.improvedPrompt : userPrompt;
+      
+      // Step 1: Generate code
+      log('Generating code from prompt...', 'info');
+      const genStartTime = Date.now();
+      
+      const generation = await generateCodeWithAgent(finalPrompt, maxRetries, model);
+      const genDuration = Date.now() - genStartTime;
+      totalGenDuration += genDuration;
+      
+      // Record generation attempt in session data
+      const genAttempt: GenerationAttempt = {
+        attemptNumber: iteration,
+        timestamp: new Date().toISOString(),
+        extractionSuccess: generation.success,
+        rawResponse: generation.rawResponse,
+        extractedCode: generation.code,
         error: generation.error,
-        attempts: generation.attempts 
-      });
-      
-      sessionData.error = generation.error || 'Code generation failed';
-      
-      return {
-        success: false,
-        prompt: userPrompt,
-        generation,
-        execution: {
-          success: false,
-          output: '',
-          parsedOutput: null,
-          hasError: true,
-          errorType: null,
-          errorMessage: 'Code generation failed',
-          raw: { result: '' }
-        },
-        logs,
-        duration: {
-          generation: genDuration,
-          execution: 0,
-          total: Date.now() - startTime
-        },
-        history: sessionData
+        prompt: finalPrompt,
+        recommendation: promptImprovement.recommendation
       };
-    }
-    
-    log('Code generated successfully', 'success', {
-      attempts: generation.attempts,
-      model: generation.model,
-      codeLength: generation.code.length
-    });
-    
-    // Store the generated code in session data
-    sessionData.finalCode = generation.code;
-    
-    // Step 2: Execute code
-    log('Executing code in Daytona sandbox...', 'info');
-    const execStartTime = Date.now();
-    
-    const execution = await executeCodeInSandbox(generation.code, language);
-    const execDuration = Date.now() - execStartTime;
-    
-    // Mark that execution was attempted
-    sessionData.wasExecuted = true;
-    
-    // Record execution results in the last attempt
-    const execResult: SessionExecutionResult = {
-      success: execution.success,
-      output: execution.output,
-      error: execution.errorMessage
-    };
-    
-    if (sessionData.attempts && sessionData.attempts.length > 0) {
-      sessionData.attempts[sessionData.attempts.length - 1].execution = execResult;
-    }
-    
-    // Log execution result to Weave for tracking
-    log('Execution result recorded', 'info', {
-      executionSuccess: execResult.success,
-      hasOutput: !!execResult.output,
-      errorType: execution.errorType,
-      versionID: sessionData.versionID
-    });
-    
-    if (execution.hasError) {
-      log(`Code execution failed: ${execution.errorType} error`, 'error', {
-        errorType: execution.errorType,
-        errorMessage: execution.errorMessage,
-        output: execution.output.substring(0, 500)
+      sessionData.attempts?.push(genAttempt);
+      
+      // Log attempt to Weave for tracking
+      log('Generation attempt recorded', 'info', {
+        iteration,
+        attemptNumber: genAttempt.attemptNumber,
+        extractionSuccess: genAttempt.extractionSuccess,
+        hasCode: !!genAttempt.extractedCode,
+        versionID: sessionData.versionID
       });
       
-      sessionData.error = execution.errorMessage || `Execution failed: ${execution.errorType}`;
-    } else {
-      log('Code executed successfully', 'success', {
-        hasOutput: !!execution.output,
-        parsedSuccess: execution.parsedOutput?.success
+      if (!generation.success) {
+        log('Code generation failed', 'error', { 
+          error: generation.error,
+          attempts: generation.attempts,
+          iteration
+        });
+        
+        sessionData.error = generation.error || 'Code generation failed';
+        
+        // If this is the last iteration, return the failure
+        if (isLastIteration) {
+          return {
+            success: false,
+            prompt: userPrompt,
+            promptImprovement,
+            generation,
+            execution: {
+              success: false,
+              output: '',
+              parsedOutput: null,
+              hasError: true,
+              errorType: null,
+              errorMessage: 'Code generation failed',
+              raw: { result: '' }
+            },
+            logs,
+            duration: {
+              director: totalDirectorDuration,
+              generation: totalGenDuration,
+              execution: totalExecDuration,
+              total: Date.now() - startTime
+            },
+            history: sessionData
+          };
+        }
+        
+        // Continue to next iteration
+        lastPromptImprovement = promptImprovement;
+        lastGeneration = generation;
+        continue;
+      }
+      
+      log('Code generated successfully', 'success', {
+        attempts: generation.attempts,
+        model: generation.model,
+        codeLength: generation.code.length,
+        iteration
       });
-    }
+      
+      // Store the generated code in session data
+      sessionData.finalCode = generation.code;
+      
+      // Step 2: Execute code
+      log('Executing code in Daytona sandbox...', 'info');
+      const execStartTime = Date.now();
+      
+      const execution = await executeCodeInSandbox(generation.code, language);
+      const execDuration = Date.now() - execStartTime;
+      totalExecDuration += execDuration;
+      
+      // Mark that execution was attempted
+      sessionData.wasExecuted = true;
+      
+      // Record execution results in the current attempt
+      const execResult: SessionExecutionResult = {
+        success: execution.success,
+        output: execution.output,
+        error: execution.errorMessage
+      };
+      
+      if (sessionData.attempts && sessionData.attempts.length > 0) {
+        sessionData.attempts[sessionData.attempts.length - 1].execution = execResult;
+      }
+      
+      // Log execution result to Weave for tracking
+      log('Execution result recorded', 'info', {
+        iteration,
+        executionSuccess: execResult.success,
+        hasOutput: !!execResult.output,
+        errorType: execution.errorType,
+        versionID: sessionData.versionID
+      });
+      
+      // Store results for verdict and potential next iteration
+      lastPromptImprovement = promptImprovement;
+      lastGeneration = generation;
+      lastExecution = execution;
+      
+      // Log execution status
+      if (execution.hasError) {
+        log(`Code execution failed: ${execution.errorType} error`, 'error', {
+          errorType: execution.errorType,
+          errorMessage: execution.errorMessage,
+          output: execution.output.substring(0, 500),
+          iteration
+        });
+        
+        sessionData.error = execution.errorMessage || `Execution failed: ${execution.errorType}`;
+      } else {
+        log('Code executed successfully', 'success', {
+          hasOutput: !!execution.output,
+          parsedSuccess: execution.parsedOutput?.success,
+          iteration
+        });
+      }
+      
+      // Ask FBI Director for verdict: Should we continue or stop?
+      log('Consulting FBI Director for verdict...', 'info');
+      
+      // Build attempt history for Director's review
+      const attemptHistory = (sessionData.attempts || []).map(att => ({
+        iteration: att.attemptNumber,
+        prompt: att.prompt || userPrompt,
+        code: att.extractedCode || '',
+        executionSuccess: att.execution?.success || false,
+        executionOutput: att.execution?.output,
+        executionError: att.execution?.error,
+        errorType: execution.errorType || undefined
+      }));
+      
+      const verdict = await getDirectorVerdict(userPrompt, attemptHistory, {
+        maxIterations,
+        currentIteration: iteration,
+        language,
+        model
+      });
+      
+      log(`Director verdict: ${verdict.shouldRetry ? 'RETRY' : 'STOP'}`, verdict.shouldRetry ? 'info' : 'success', {
+        shouldRetry: verdict.shouldRetry,
+        reasoning: verdict.reasoning.substring(0, 100)
+      });
+      
+      // If execution succeeded and Director says stop, or Director says stop regardless
+      if (!verdict.shouldRetry) {
+        if (execution.success) {
+          log(`✅ Success achieved on iteration ${iteration}/${maxIterations}`, 'success');
+        } else {
+          log(`🛑 Director decided to stop despite errors (${verdict.reasoning.substring(0, 80)}...)`, 'warning');
+        }
+        break;
+      }
+      
+      // If this is the last iteration, we must stop regardless of verdict
+      if (isLastIteration) {
+        log('Max iterations reached, returning last attempt', 'warning', { maxIterations });
+        break;
+      }
+      
+      // Director says retry - continue to next iteration
+      log(`🔄 Director recommends another iteration (${verdict.reasoning.substring(0, 80)}...)`, 'info');
+      continue;
+    } // End of iteration loop
     
     // Step 3: Complete
     const totalDuration = Date.now() - startTime;
-    const overallSuccess = generation.success && execution.success;
+    
+    // Use the last attempt's results
+    const finalPromptImprovement = lastPromptImprovement!;
+    const finalGeneration = lastGeneration!;
+    const finalExecution = lastExecution!;
+    const overallSuccess = finalGeneration.success && finalExecution.success;
     
     log(
       overallSuccess ? 'Orchestration completed successfully' : 'Orchestration completed with errors',
@@ -475,19 +673,27 @@ async function dispatchAgents(
       overallSuccess
     });
     
-    return {
+    const result = {
       success: overallSuccess,
       prompt: userPrompt,
-      generation,
-      execution,
+      promptImprovement: finalPromptImprovement,
+      generation: finalGeneration,
+      execution: finalExecution,
       logs,
       duration: {
-        generation: genDuration,
-        execution: execDuration,
+        director: totalDirectorDuration,
+        generation: totalGenDuration,
+        execution: totalExecDuration,
         total: totalDuration
       },
       history: sessionData
     };
+    
+    // Log the complete session data to Weave as the trace output
+    // This creates ONE trace with all session data visible
+    console.log('📊 Trace complete - all session data logged to Weave');
+    
+    return result;
     
   } catch (error) {
     const err = error as Error;
@@ -507,16 +713,25 @@ async function dispatchAgents(
 /**
  * FBI Case Handler: Orchestrate Mission 🎯
  * 
- * Dispatches field agents to complete the mission:
- * 1. Agent generates code from user prompt
- * 2. Agent executes code in secure sandbox
- * 3. Build complete case file (session data)
+ * ⭐ SINGLE TRACE POINT - This is the ONLY function wrapped with weave.op()
  * 
- * All operations are traced for the case file.
+ * Creates ONE trace per agent creation session containing:
+ * - All iteration attempts with prompts, code, and execution results
+ * - Director verdicts and recommendations
+ * - Complete error information (500s, timeouts, Daytona errors, etc.)
+ * - Full session metadata (AgentCreationHistory)
+ * - Duration metrics for each phase
+ * 
+ * Workflow:
+ * 0. FBI Director reviews and improves the prompt
+ * 1. Agent generates code from improved prompt
+ * 2. Agent executes code in secure sandbox
+ * 3. Director makes verdict (retry or stop)
+ * 4. Repeat or return complete case file
  * 
  * @param userPrompt - The user's prompt describing what they want
  * @param options - Configuration options
- * @returns Complete case file with all evidence traced
+ * @returns Complete case file with all evidence in ONE trace
  */
 export const orchestrate = weave.op(dispatchAgents);
 
@@ -547,37 +762,34 @@ export async function run(
 // ============================================================================
 
 /**
- * Test the orchestrator
- * 
- * @param customPrompts - Optional array of custom prompts to test
+ * Test the orchestrator with simple prompts (single iteration expected)
  */
-export async function testOrchestrator(customPrompts?: string[]): Promise<void> {
-  console.log('🚀 Starting FBI Orchestrator Test...\n');
+export async function testOrchestratorSimple(): Promise<void> {
+  console.log('🚀 Starting FBI Orchestrator Simple Test (no refinement expected)...\n');
   
   // Initialize Weave for tracing
   console.log('🔍 Initializing Weave tracing...');
   await weave.init();
   console.log('');
   
-  const defaultPrompts = [
-    'Create a function that calculates the factorial of 5',
-    'Generate code that reverses the string "hello world"',
-    'Write code that sums all numbers from 1 to 100'
+  const simplePrompts = [
+    'Create a function that calculates the factorial of 5 and outputs the result',
+    'Generate code that reverses the string "hello world" and prints it',
+    'Write code that sums all numbers from 1 to 100 and displays the total'
   ];
   
-  const testPrompts = customPrompts && customPrompts.length > 0 ? customPrompts : defaultPrompts;
+  console.log(`📋 Testing ${simplePrompts.length} simple prompt(s)\n`);
   
-  console.log(`📋 Testing ${testPrompts.length} prompt(s)\n`);
-  
-  for (let i = 0; i < testPrompts.length; i++) {
-    const prompt = testPrompts[i];
+  for (let i = 0; i < simplePrompts.length; i++) {
+    const prompt = simplePrompts[i];
     console.log('\n' + '='.repeat(60));
-    console.log(`📋 Test ${i + 1}/${testPrompts.length}: ${prompt}`);
+    console.log(`📋 Test ${i + 1}/${simplePrompts.length}: ${prompt}`);
     console.log('='.repeat(60) + '\n');
     
     try {
       const result = await orchestrate(prompt, {
-        agentName: `test-agent-${i + 1}`,
+        agentName: `simple-test-${i + 1}`,
+        maxIterations: 1, // Only one iteration for simple tests
         logCallback: (log) => {
           // Additional logging if needed - these are already being logged
         }
@@ -588,13 +800,102 @@ export async function testOrchestrator(customPrompts?: string[]): Promise<void> 
       console.log(`Success: ${result.success}`);
       console.log(`Version ID: ${result.history.versionID}`);
       console.log(`Agent Name: ${result.history.agentName}`);
-      console.log(`Generation attempts: ${result.generation.attempts}`);
+      console.log(`Total iterations: ${result.history.attempts?.length || 0}`);
       console.log(`Execution status: ${result.execution.success ? 'OK' : 'ERROR'}`);
       if (result.execution.errorType) {
         console.log(`Error type: ${result.execution.errorType}`);
       }
       
       console.log(`\n⏱️  Duration:`);
+      console.log(`  - Director: ${result.duration.director}ms`);
+      console.log(`  - Generation: ${result.duration.generation}ms`);
+      console.log(`  - Execution: ${result.duration.execution}ms`);
+      console.log(`  - Total: ${result.duration.total}ms`);
+      
+      if (result.promptImprovement) {
+        console.log('\n🎯 Prompt Review:');
+        console.log(`  - Original prompt length: ${result.promptImprovement.originalPrompt.length} chars`);
+        console.log(`  - Improved prompt length: ${result.promptImprovement.improvedPrompt.length} chars`);
+        if (result.promptImprovement.improvements && result.promptImprovement.improvements.length > 0) {
+          console.log(`  - Improvements applied: ${result.promptImprovement.improvements.length}`);
+        }
+        if (result.promptImprovement.recommendation) {
+          console.log(`  - Recommendation: ${result.promptImprovement.recommendation.substring(0, 80)}...`);
+        }
+      }
+      
+      console.log('\n📝 Session Data:');
+      console.log(`  - Total attempts: ${result.history.attempts?.length || 0}`);
+      console.log(`  - Was executed: ${result.history.wasExecuted}`);
+      console.log(`  - Final code length: ${result.history.finalCode.length} chars`);
+      console.log(`  - Has error: ${!!result.history.error}`);
+      
+      if (result.execution.parsedOutput) {
+        console.log('\n✨ Parsed Output:');
+        console.log(JSON.stringify(result.execution.parsedOutput, null, 2));
+      }
+      
+      console.log('---\n');
+      
+    } catch (error) {
+      const err = error as Error;
+      console.error(`❌ Test failed: ${err.message}\n`);
+    }
+  }
+  
+  console.log('\n✅ Simple tests complete!\n');
+  console.log('🔍 Check your Weave dashboard for traces: https://wandb.ai/\n');
+}
+
+/**
+ * Test the orchestrator with complex/error-prone prompts (refinement expected)
+ */
+export async function testOrchestratorRefinement(): Promise<void> {
+  console.log('🚀 Starting FBI Orchestrator Refinement Test (errors expected, refinement should fix)...\n');
+  
+  // Initialize Weave for tracing
+  console.log('🔍 Initializing Weave tracing...');
+  await weave.init();
+  console.log('');
+  
+  // These prompts are deliberately vague/error-prone to trigger refinement
+  const complexPrompts = [
+    'Sort an array', // Vague - should fail first, then refine to be more specific
+    'Parse JSON from a string and handle errors', // Missing details about output format
+    'Calculate fibonacci' // Missing which number, output format, etc.
+  ];
+  
+  console.log(`📋 Testing ${complexPrompts.length} complex/vague prompt(s)\n`);
+  console.log('💡 These prompts are intentionally vague to test refinement capabilities\n');
+  
+  for (let i = 0; i < complexPrompts.length; i++) {
+    const prompt = complexPrompts[i];
+    console.log('\n' + '='.repeat(80));
+    console.log(`📋 Refinement Test ${i + 1}/${complexPrompts.length}: "${prompt}"`);
+    console.log('='.repeat(80) + '\n');
+    
+    try {
+      const result = await orchestrate(prompt, {
+        agentName: `refinement-test-${i + 1}`,
+        maxIterations: 3, // Allow up to 3 refinement iterations
+        logCallback: (log) => {
+          // Additional logging if needed - these are already being logged
+        }
+      });
+      
+      console.log('\n📊 RESULT:');
+      console.log('---');
+      console.log(`Success: ${result.success}`);
+      console.log(`Version ID: ${result.history.versionID}`);
+      console.log(`Agent Name: ${result.history.agentName}`);
+      console.log(`Total iterations: ${result.history.attempts?.length || 0}`);
+      console.log(`Execution status: ${result.execution.success ? 'OK' : 'ERROR'}`);
+      if (result.execution.errorType) {
+        console.log(`Error type: ${result.execution.errorType}`);
+      }
+      
+      console.log(`\n⏱️  Duration:`);
+      console.log(`  - Director: ${result.duration.director}ms`);
       console.log(`  - Generation: ${result.duration.generation}ms`);
       console.log(`  - Execution: ${result.duration.execution}ms`);
       console.log(`  - Total: ${result.duration.total}ms`);
@@ -606,22 +907,34 @@ export async function testOrchestrator(customPrompts?: string[]): Promise<void> 
       console.log(`  - Has error: ${!!result.history.error}`);
       
       if (result.history.attempts && result.history.attempts.length > 0) {
-        console.log('\n🔍 Attempts:');
+        console.log('\n🔄 Refinement Iterations:');
         result.history.attempts.forEach((attempt, idx) => {
-          console.log(`  Attempt ${idx + 1}:`);
-          console.log(`    - Success: ${attempt.extractionSuccess}`);
+          console.log(`\n  Iteration ${idx + 1}:`);
+          console.log(`    - Extraction success: ${attempt.extractionSuccess}`);
           console.log(`    - Timestamp: ${attempt.timestamp}`);
+          
+          if (attempt.recommendation) {
+            console.log(`    - 💡 Recommendation: ${attempt.recommendation.substring(0, 100)}...`);
+          }
+          
           if (attempt.execution) {
             console.log(`    - Execution success: ${attempt.execution.success}`);
+            if (!attempt.execution.success && attempt.execution.error) {
+              console.log(`    - ❌ Error: ${attempt.execution.error.substring(0, 100)}...`);
+            }
             console.log(`    - Output length: ${attempt.execution.output?.length || 0} chars`);
+          }
+          
+          if (attempt.prompt) {
+            console.log(`    - Prompt length: ${attempt.prompt.length} chars`);
           }
         });
       }
       
-      console.log('\n💻 Generated Code (preview):');
+      console.log('\n💻 Final Generated Code (preview):');
       console.log(result.generation.code.substring(0, 300) + '...');
       
-      console.log('\n📤 Execution Output:');
+      console.log('\n📤 Final Execution Output:');
       console.log(result.execution.output.substring(0, 500));
       
       if (result.execution.parsedOutput) {
@@ -637,8 +950,59 @@ export async function testOrchestrator(customPrompts?: string[]): Promise<void> 
     }
   }
   
-  console.log('\n✅ FBI Orchestrator tests complete!\n');
+  console.log('\n✅ Refinement tests complete!\n');
   console.log('🔍 Check your Weave dashboard for traces: https://wandb.ai/\n');
+}
+
+/**
+ * Test the orchestrator (legacy function - runs simple tests)
+ * 
+ * @param customPrompts - Optional array of custom prompts to test
+ */
+export async function testOrchestrator(customPrompts?: string[]): Promise<void> {
+  if (customPrompts && customPrompts.length > 0) {
+    console.log('🚀 Starting FBI Orchestrator Test with custom prompts...\n');
+    
+    // Initialize Weave for tracing
+    console.log('🔍 Initializing Weave tracing...');
+    await weave.init();
+    console.log('');
+    
+    console.log(`📋 Testing ${customPrompts.length} custom prompt(s)\n`);
+    
+    for (let i = 0; i < customPrompts.length; i++) {
+      const prompt = customPrompts[i];
+      console.log('\n' + '='.repeat(60));
+      console.log(`📋 Test ${i + 1}/${customPrompts.length}: ${prompt}`);
+      console.log('='.repeat(60) + '\n');
+      
+      try {
+        const result = await orchestrate(prompt, {
+          agentName: `test-agent-${i + 1}`,
+          maxIterations: 3,
+          logCallback: (log) => {
+            // Additional logging if needed - these are already being logged
+          }
+        });
+        
+        console.log('\n📊 RESULT:');
+        console.log('---');
+        console.log(`Success: ${result.success}`);
+        console.log(`Total iterations: ${result.history.attempts?.length || 0}`);
+        console.log(`Execution status: ${result.execution.success ? 'OK' : 'ERROR'}`);
+        console.log('---\n');
+        
+      } catch (error) {
+        const err = error as Error;
+        console.error(`❌ Test failed: ${err.message}\n`);
+      }
+    }
+    
+    console.log('\n✅ Custom tests complete!\n');
+  } else {
+    // No custom prompts - run simple tests
+    await testOrchestratorSimple();
+  }
 }
 
 // If run directly, execute tests
@@ -646,12 +1010,27 @@ if (import.meta.main) {
   // Check for command-line arguments
   const args = Deno.args;
   
-  if (args.length > 0) {
+  // Check for test type flag
+  const testType = args[0];
+  
+  if (testType === 'refinement' || testType === '--refinement') {
+    // Run refinement tests (vague prompts that require iteration)
+    console.log('🔧 Running refinement tests (error-prone prompts)\n');
+    testOrchestratorRefinement();
+  } else if (testType === 'simple' || testType === '--simple') {
+    // Run simple tests (clear prompts that should work first try)
+    console.log('🔧 Running simple tests (clear prompts)\n');
+    testOrchestratorSimple();
+  } else if (args.length > 0 && !testType.startsWith('--')) {
     // Use provided prompts from command line
     console.log('🔧 Running with custom prompts from command line\n');
     testOrchestrator(args);
   } else {
-    // Use default test prompts
+    // Default: run simple tests
+    console.log('🔧 Running default simple tests\n');
+    console.log('💡 Use: deno task test:fbi refinement  - for refinement tests');
+    console.log('💡 Use: deno task test:fbi simple      - for simple tests');
+    console.log('💡 Use: deno task test:fbi "prompt"    - for custom prompts\n');
     testOrchestrator();
   }
 }

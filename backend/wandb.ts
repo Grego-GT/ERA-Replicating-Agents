@@ -112,6 +112,7 @@ function getWandbConfig(): WandbConfig {
 /**
  * LLM Conversation Handler
  * Sends messages to Wandb Inference API and gets completion
+ * Wrapped with weave.op() for full tracing including errors
  * 
  * @param options - Chat options
  * @returns The completion response
@@ -124,8 +125,12 @@ async function llmConversation({
   maxTokens = null,
   topP = null
 }: ChatOptions): Promise<ChatCompletionResponse> {
+  const startTime = Date.now();
+  
   // Acquire semaphore token
   await sema.acquire();
+  
+  console.log(`🤖 Wandb API call starting (model: ${model})...`);
   
   try {
     const { apiKey, project } = getWandbConfig();
@@ -167,22 +172,56 @@ async function llmConversation({
       body: JSON.stringify(body)
     });
     
+    const duration = Date.now() - startTime;
+    
     if (!response.ok) {
       const errorText = await response.text();
+      const errorStatus = response.status;
+      
+      // Log detailed error for Weave trace visibility
+      console.error(`❌ Wandb API error (${errorStatus}) after ${duration}ms`);
+      console.error(`Error response: ${errorText.substring(0, 500)}`);
+      
       sema.release(); // Release on error
-      throw new Error(`Wandb API error (${response.status}): ${errorText}`);
+      
+      // Create enriched error object that Weave can capture in trace
+      const errorObj = new Error(`Wandb API error (${errorStatus}): ${errorText}`);
+      (errorObj as any).statusCode = errorStatus;
+      (errorObj as any).errorResponse = errorText;
+      (errorObj as any).duration = duration;
+      (errorObj as any).model = model;
+      (errorObj as any).messagesCount = fullMessages.length;
+      (errorObj as any).timestamp = new Date().toISOString();
+      
+      throw errorObj;
     }
     
     const data = await response.json() as ChatCompletionResponse;
     
-    console.log(`✅ Chat completion received (model: ${model})`);
+    console.log(`✅ Chat completion received (model: ${model}) in ${duration}ms`);
+    if (data.usage?.total_tokens) {
+      console.log(`📊 Token usage: ${data.usage.total_tokens} total tokens`);
+    }
     
     return data;
     
   } catch (error) {
     const err = error as Error;
-    console.error('❌ Chat completion failed:', err);
-    throw error;
+    const duration = Date.now() - startTime;
+    
+    // Enhanced error logging with full context for debugging
+    console.error('❌ Chat completion failed:', err.message);
+    console.error(`⏱️  Failed after ${duration}ms`);
+    
+    // Enrich error with metadata for Weave tracing
+    if (!(err as any).duration) {
+      (err as any).duration = duration;
+      (err as any).model = model;
+      (err as any).messagesCount = messages.length;
+      (err as any).timestamp = new Date().toISOString();
+    }
+    
+    throw err;
   } finally {
     // Always release the semaphore token
     sema.release();

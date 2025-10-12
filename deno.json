@@ -20,7 +20,10 @@
     "prod": "deployctl deploy --prod --project=agfactory",
     "test:wandb": "deno run --allow-net --allow-env --allow-sys backend/wandb.ts",
     "test:daytona": "deno run --allow-net --allow-env --allow-sys backend/daytona.ts",
+    "test:director": "deno run --allow-net --allow-read --allow-env --allow-sys backend/director.ts",
     "test:fbi": "deno run --allow-net --allow-read --allow-env --allow-sys backend/fbi.ts",
+    "test:fbi:simple": "deno run --allow-net --allow-read --allow-env --allow-sys backend/fbi.ts simple",
+    "test:fbi:refinement": "deno run --allow-net --allow-read --allow-env --allow-sys backend/fbi.ts refinement",
     "test": "deno run --allow-net --allow-read --allow-env --allow-sys backend/fbi.ts",
     "test:weave": "deno run --allow-net --allow-env --allow-sys backend/test-weave-integration.ts",
     "example:wandb-weave": "deno run --allow-net --allow-env --allow-sys backend/wandb-weave-example.ts"

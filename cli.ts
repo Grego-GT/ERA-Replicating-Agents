@@ -121,15 +121,17 @@ function formatAIGeneratedCode(name: string, promptText: string, generatedCode: 
   return header + generatedCode;
 }
 
-async function createAgentWithAI(name: string, promptText: string): Promise<void> {
+async function createAgentWithAI(name: string, promptText: string, maxIterations: number = 3): Promise<void> {
   console.log(colorize(`\n🤖 Creating agent: ${colorize(name, "bold")}`, "green"));
   console.log(colorize(`💬 Prompt: ${colorize(promptText, "bold")}`, "blue"));
+  console.log(colorize(`🔄 Max iterations: ${colorize(maxIterations.toString(), "bold")}`, "gray"));
   console.log(colorize('\n⏳ Calling FBI orchestrator (AI code generation + execution)...\n', "cyan"));
   
   try {
-    // Call the FBI orchestrator (generation + execution)
+    // Call the FBI orchestrator (generation + execution with retry/refinement)
     const result = await orchestratorRun(promptText, {
       maxRetries: 3,
+      maxIterations,
       agentName: name,
       logCallback: (log) => {
         // Show important log messages
@@ -302,10 +304,10 @@ async function startInteractiveMode(): Promise<void> {
 
 async function handleCommandLine(args: string[]): Promise<void> {
   const flags = parse(args, {
-    string: ["prompt", "p"],
+    string: ["prompt", "p", "iterations", "i"],
     boolean: ["ai", "simple"],
-    alias: { p: "prompt" },
-    default: { ai: false, simple: false }
+    alias: { p: "prompt", i: "iterations" },
+    default: { ai: false, simple: false, iterations: "3" }
   });
 
   const command = flags._[0]?.toString();
@@ -315,7 +317,7 @@ async function handleCommandLine(args: string[]): Promise<void> {
     
     if (!name) {
       console.log(colorize('❌ Error: Agent name is required', "red"));
-      console.log(colorize('Usage: deno task cli:create <name> --prompt "Your prompt" [--ai|--simple]', "gray"));
+      console.log(colorize('Usage: deno task cli:create <name> --prompt "Your prompt" [--ai|--simple] [--iterations N]', "gray"));
       Deno.exit(1);
     }
 
@@ -323,19 +325,21 @@ async function handleCommandLine(args: string[]): Promise<void> {
     
     if (!promptText) {
       console.log(colorize('❌ Error: Prompt is required', "red"));
-      console.log(colorize('Usage: deno task cli:create <name> --prompt "Your prompt" [--ai|--simple]', "gray"));
+      console.log(colorize('Usage: deno task cli:create <name> --prompt "Your prompt" [--ai|--simple] [--iterations N]', "gray"));
       Deno.exit(1);
     }
     
+    const maxIterations = parseInt(flags.iterations?.toString() || "3");
+    
     // Determine generation method
     if (flags.ai) {
-      await createAgentWithAI(name, promptText);
+      await createAgentWithAI(name, promptText, maxIterations);
     } else if (flags.simple) {
       await createAgentSimple(name, promptText);
     } else {
       // Default to AI generation
       console.log(colorize('💡 Using AI generation (use --simple for template-only)', "gray"));
-      await createAgentWithAI(name, promptText);
+      await createAgentWithAI(name, promptText, maxIterations);
     }
   } else if (command === "help" || command === "--help" || command === "-h") {
     displayHelp();
@@ -355,15 +359,21 @@ function displayHelp(): void {
   console.log('  help                    Show this help message\n');
   console.log(colorize('Options:', "yellow"));
   console.log('  -p, --prompt <text>     Agent prompt/instructions (required)');
+  console.log('  -i, --iterations <n>    Max refinement iterations (default: 3)');
   console.log('  --ai                    Use AI code generation (default)');
   console.log('  --simple                Use simple template (no AI)\n');
   console.log(colorize('Examples:', "yellow"));
   console.log('  # Interactive mode (recommended)');
   console.log('  deno task cli\n');
-  console.log('  # AI-powered generation (default)');
+  console.log('  # AI-powered generation (default, 3 iterations)');
   console.log('  deno task cli:create calculator -p "Create a calculator that adds two numbers"\n');
+  console.log('  # With custom iterations (refinement retries)');
+  console.log('  deno task cli:create factorial -p "Calculate factorial" --iterations 5\n');
   console.log('  # Simple template');
   console.log('  deno task cli:create hello --simple -p "Say hello"\n');
+  console.log(colorize('About Iterations:', "yellow"));
+  console.log('  The FBI Director will retry code generation + execution up to N times.');
+  console.log('  Each retry refines the prompt based on previous errors.\n');
   console.log(colorize('Requirements for AI generation:', "yellow"));
   console.log('  - WANDB_API_KEY in .env (for code generation)');
   console.log('  - DAYTONA_API_KEY in .env (for code validation)\n');
