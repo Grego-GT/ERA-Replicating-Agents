@@ -85,30 +85,49 @@ async function select(message: string, choices: string[]): Promise<string> {
 
 /**
  * Number-based selection with name/value pairs (like Cliffy's Select)
+ * Returns either the selected value OR "__custom__:<user input>" if they typed text
  */
 async function selectWithValue(
   message: string,
-  options: Array<{ name: string; value: string }>
+  options: Array<{ name: string; value: string }>,
+  allowCustomInput: boolean = false
 ): Promise<string> {
   console.log(colorize(`\n? ${message}`, "cyan"));
   options.forEach((option, idx) => {
     console.log(colorize(`  ${idx + 1}. ${option.name}`, "cyan"));
   });
-  console.log(colorize(`\n  Enter choice (1-${options.length}): `, "yellow"), "");
+  
+  const hint = allowCustomInput 
+    ? `${colorize("[default: 1, or type your prompt]", "gray")}`
+    : `${colorize("[default: 1]", "gray")}`;
+  console.log(colorize(`\n  Enter choice (1-${options.length}) ${hint}: `, "yellow"), "");
   
   const buf = new Uint8Array(1024);
   const n = await Deno.stdin.read(buf);
   if (n === null) return options[0].value;
   
   const input = new TextDecoder().decode(buf.subarray(0, n)).trim();
+  
+  // Default to first option if empty input
+  if (input === "") {
+    return options[0].value;
+  }
+  
   const idx = parseInt(input) - 1;
   
-  if (idx >= 0 && idx < options.length) {
+  // Valid number choice
+  if (!isNaN(idx) && idx >= 0 && idx < options.length) {
     return options[idx].value;
   }
   
+  // If custom input is allowed and they typed something that's not a valid number
+  if (allowCustomInput && input.length > 0) {
+    console.log(colorize(`  ✨ Using custom prompt: "${input.substring(0, 50)}${input.length > 50 ? "..." : ""}"`, "green"));
+    return `__custom__:${input}`;
+  }
+  
   console.log(colorize("  ❌ Invalid choice, please try again.", "red"));
-  return await selectWithValue(message, options);
+  return await selectWithValue(message, options, allowCustomInput);
 }
 
 // ============================================================================
@@ -696,14 +715,18 @@ async function startInteractiveMode(): Promise<void> {
           name: "✨ Define Your Own Agent",
           value: "custom",
         },
-      ]
+      ],
+      true // Allow custom input
     );
 
     let promptText = "";
     let suggestedName = "";
 
-    // Handle template selection
-    if (quickStartChoice === "fizzbuzz") {
+    // Check if user typed custom input directly
+    if (quickStartChoice.startsWith("__custom__:")) {
+      promptText = quickStartChoice.substring("__custom__:".length);
+      // Skip template handling, go straight to name generation
+    } else if (quickStartChoice === "fizzbuzz") {
       promptText =
         "Create a FizzBuzz solver that prints numbers 1 to 100, replacing multiples of 3 with 'Fizz', multiples of 5 with 'Buzz', and multiples of both with 'FizzBuzz'. Output each result on a new line.";
       suggestedName = "fizzbuzz-solver";

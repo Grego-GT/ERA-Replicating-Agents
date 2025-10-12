@@ -296,7 +296,93 @@ async function agentExecuteCode(
 ): Promise<ExecutionResult> {
   try {
     // Code already has utilities injected at the orchestrator level
-    const response = await runCode(code, language);
+    // Pass all relevant env vars to Daytona sandbox so agents can use utilities
+    const envVars: Record<string, string> = {};
+    
+    // === Core API Keys ===
+    
+    // WANDB (always needed for Weave tracing)
+    if (Deno.env.get('WANDB_API_KEY')) {
+      envVars.WANDB_API_KEY = Deno.env.get('WANDB_API_KEY')!;
+    }
+    
+    // Daytona (for agents that spawn other agents)
+    if (Deno.env.get('DAYTONA_API_KEY')) {
+      envVars.DAYTONA_API_KEY = Deno.env.get('DAYTONA_API_KEY')!;
+    }
+    if (Deno.env.get('DAYTONA_API_URL')) {
+      envVars.DAYTONA_API_URL = Deno.env.get('DAYTONA_API_URL')!;
+    }
+    
+    // === Inference Configuration ===
+    
+    // Global inference settings
+    if (Deno.env.get('INFERENCE_API_KEY')) {
+      envVars.INFERENCE_API_KEY = Deno.env.get('INFERENCE_API_KEY')!;
+    }
+    if (Deno.env.get('INFERENCE_URL')) {
+      envVars.INFERENCE_URL = Deno.env.get('INFERENCE_URL')!;
+    }
+    if (Deno.env.get('AI_MODEL')) {
+      envVars.AI_MODEL = Deno.env.get('AI_MODEL')!;
+    }
+    
+    // Component-specific inference (in case agents use these)
+    if (Deno.env.get('INFERENCE_API_KEY_DIRECTOR')) {
+      envVars.INFERENCE_API_KEY_DIRECTOR = Deno.env.get('INFERENCE_API_KEY_DIRECTOR')!;
+    }
+    if (Deno.env.get('INFERENCE_API_KEY_CODEGEN')) {
+      envVars.INFERENCE_API_KEY_CODEGEN = Deno.env.get('INFERENCE_API_KEY_CODEGEN')!;
+    }
+    if (Deno.env.get('INFERENCE_API_KEY_FBI')) {
+      envVars.INFERENCE_API_KEY_FBI = Deno.env.get('INFERENCE_API_KEY_FBI')!;
+    }
+    if (Deno.env.get('INFERENCE_API_KEY_SLUGGEN')) {
+      envVars.INFERENCE_API_KEY_SLUGGEN = Deno.env.get('INFERENCE_API_KEY_SLUGGEN')!;
+    }
+    
+    if (Deno.env.get('INFERENCE_URL_DIRECTOR')) {
+      envVars.INFERENCE_URL_DIRECTOR = Deno.env.get('INFERENCE_URL_DIRECTOR')!;
+    }
+    if (Deno.env.get('INFERENCE_URL_CODEGEN')) {
+      envVars.INFERENCE_URL_CODEGEN = Deno.env.get('INFERENCE_URL_CODEGEN')!;
+    }
+    if (Deno.env.get('INFERENCE_URL_FBI')) {
+      envVars.INFERENCE_URL_FBI = Deno.env.get('INFERENCE_URL_FBI')!;
+    }
+    if (Deno.env.get('INFERENCE_URL_SLUGGEN')) {
+      envVars.INFERENCE_URL_SLUGGEN = Deno.env.get('INFERENCE_URL_SLUGGEN')!;
+    }
+    
+    if (Deno.env.get('AI_MODEL_DIRECTOR')) {
+      envVars.AI_MODEL_DIRECTOR = Deno.env.get('AI_MODEL_DIRECTOR')!;
+    }
+    if (Deno.env.get('AI_MODEL_CODEGEN')) {
+      envVars.AI_MODEL_CODEGEN = Deno.env.get('AI_MODEL_CODEGEN')!;
+    }
+    if (Deno.env.get('AI_MODEL_FBI')) {
+      envVars.AI_MODEL_FBI = Deno.env.get('AI_MODEL_FBI')!;
+    }
+    if (Deno.env.get('AI_MODEL_SLUGGEN')) {
+      envVars.AI_MODEL_SLUGGEN = Deno.env.get('AI_MODEL_SLUGGEN')!;
+    }
+    
+    // === Utility API Keys ===
+    
+    // Tavily (search)
+    if (Deno.env.get('TAVILY_API_KEY')) {
+      envVars.TAVILY_API_KEY = Deno.env.get('TAVILY_API_KEY')!;
+    }
+    
+    // Browserbase (browser automation)
+    if (Deno.env.get('BROWSERBASE_API_KEY')) {
+      envVars.BROWSERBASE_API_KEY = Deno.env.get('BROWSERBASE_API_KEY')!;
+    }
+    if (Deno.env.get('BROWSERBASE_PROJECT_ID')) {
+      envVars.BROWSERBASE_PROJECT_ID = Deno.env.get('BROWSERBASE_PROJECT_ID')!;
+    }
+    
+    const response = await runCode(code, language, envVars);
     return analyzeExecutionOutput(response);
   } catch (error) {
     const err = error as Error;
@@ -338,7 +424,7 @@ async function dispatchAgents(
   const {
     maxRetries = 3, // Retries for code generation extraction
     maxIterations = 3, // Full refinement iterations (director -> generate -> execute)
-    language = 'typescript',
+    language = 'javascript', // Use JavaScript by default (not TypeScript strict mode)
     model = Deno.env.get('AI_MODEL_FBI') || Deno.env.get('AI_MODEL') || "Qwen/Qwen3-Coder-480B-A35B-Instruct",
     logCallback = null,
     agentName = 'unnamed-agent',
@@ -630,6 +716,11 @@ async function dispatchAgents(
           output: execution.output.substring(0, 500),
           iteration
         });
+        
+        // Also log the full error details to console for debugging
+        if (execution.errorMessage) {
+          console.log(`\n📋 Full Error Details:\n${execution.errorMessage.substring(0, 1000)}\n`);
+        }
         
         sessionData.error = execution.errorMessage || `Execution failed: ${execution.errorType}`;
       } else {

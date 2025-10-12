@@ -19,43 +19,66 @@
  */
 export const WANDB_NODE_UTIL = `
 // === Wandb Chat Utility (Auto-injected) ===
-async function wandbChat(userMessage: string, options: any = {}): Promise<string> {
+async function wandbChat(userMessage, options = {}) {
   const fetch = require('node-fetch');
-  const apiKey = process.env.WANDB_API_KEY;
   
-  if (!apiKey) {
-    throw new Error('WANDB_API_KEY not found in environment');
+  try {
+    // Check for API key with fallback chain: INFERENCE_API_KEY → WANDB_API_KEY
+    const apiKey = process.env.INFERENCE_API_KEY || process.env.WANDB_API_KEY;
+    
+    if (!apiKey) {
+      throw new Error('INFERENCE_API_KEY or WANDB_API_KEY not found in environment');
+    }
+    
+    // Check for inference URL with fallback to Wandb default
+    const inferenceUrl = process.env.INFERENCE_URL || 'https://api.inference.wandb.ai/v1/chat/completions';
+    
+    const body = {
+      model: options.model || process.env.AI_MODEL || 'Qwen/Qwen3-Coder-480B-A35B-Instruct',
+      messages: [{ role: 'user', content: userMessage }],
+    };
+    
+    // Add optional parameters
+    if (options.systemPrompt !== undefined) {
+      body.messages = [
+        { role: 'system', content: options.systemPrompt },
+        { role: 'user', content: userMessage }
+      ];
+    }
+    
+    const response = await fetch(inferenceUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': \`Bearer \${apiKey}\`
+      },
+      body: JSON.stringify(body)
+    });
+    
+    if (!response.ok) {
+      let errorText = '';
+      try {
+        errorText = await response.text();
+      } catch (e) {
+        errorText = response.statusText || 'Unknown error';
+      }
+      throw new Error(\`Inference API error (\${response.status}): \${errorText}\`);
+    }
+    
+    const data = await response.json();
+    
+    if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+      throw new Error('Invalid response format from inference API');
+    }
+    
+    return data.choices[0].message.content;
+  } catch (error) {
+    // Ensure we always throw a proper Error object, not a Response
+    if (error instanceof Error) {
+      throw error;
+    }
+    throw new Error(\`wandbChat error: \${String(error)}\`);
   }
-  
-  const body: any = {
-    model: options.model || 'Qwen/Qwen3-Coder-480B-A35B-Instruct',
-    messages: [{ role: 'user', content: userMessage }],
-  };
-  
-  // Add optional parameters
-  if (options.systemPrompt !== undefined) {
-    body.messages = [
-      { role: 'system', content: options.systemPrompt },
-      { role: 'user', content: userMessage }
-    ];
-  }
-  
-  const response = await fetch('https://api.inference.wandb.ai/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': \`Bearer \${apiKey}\`
-    },
-    body: JSON.stringify(body)
-  });
-  
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(\`Wandb API error (\${response.status}): \${errorText}\`);
-  }
-  
-  const data = await response.json();
-  return data.choices[0].message.content;
 }
 // === End Wandb Utility ===
 `.trim();

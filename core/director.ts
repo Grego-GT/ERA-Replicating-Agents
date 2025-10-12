@@ -216,10 +216,11 @@ Your mission: Transform user prompts into optimized, detailed instructions that 
 
 ## When Refining After Errors:
 If previous execution failed, focus on:
-- **Compilation errors**: Add type definitions, imports, or syntax clarifications
+- **Compilation errors**: Fix syntax, remove TypeScript types (use plain JavaScript!), clarify imports
 - **Runtime errors**: Specify input validation, edge case handling, or logic fixes
 - **Daytona errors**: Adjust output format, add proper error handling, or fix environment issues
 - Learn from the previous code and errors to make specific improvements
+- **CRITICAL**: If seeing TypeScript errors about 'unknown' types, the code is using TypeScript - tell codegen to use PLAIN JAVASCRIPT instead!
 
 ## Guidelines:
 - Preserve the user's core intent
@@ -234,11 +235,19 @@ If previous execution failed, focus on:
 ## When to Use Utilities:
 - Use utilities (wandbChat, initWeave, etc.) ONLY if the user's task explicitly requires them
 - For SIMPLE algorithmic tasks (FizzBuzz, factorial, sorting, string manipulation):
-  → Write plain JavaScript/TypeScript - NO utilities needed!
+  → Write plain JavaScript - NO utilities needed! Keep it simple!
 - For LLM/AI tasks (joke generation, text analysis, chatbots):
   → Use wandbChat or simpleChat
 - For observability/tracing (ONLY if user asks):
   → Use initWeave and createTracedOp with format "{agent-name}:{operation-name}"
+  
+## Code Style Requirements:
+- **ALWAYS use PLAIN JAVASCRIPT** - NOT TypeScript!
+- Do NOT use type annotations (no colons for types)
+- Do NOT use type casting with 'as' keyword
+- Use simple error handling with conditional property access
+- Keep code minimal and clean
+- Focus on working code, not type safety
   
 ## Tracing and Observability (Only When Requested):
 When the user explicitly asks for "tracing", "observability", or "weave":
@@ -287,7 +296,7 @@ async function improvePrompt(
     agentName = 'unnamed-agent',
     systemPrompt,
     judgingCriteria,
-    language = 'typescript',
+    language = 'javascript', // Use JavaScript by default (not TypeScript strict mode)
     context,
     model = Deno.env.get('AI_MODEL_DIRECTOR') || Deno.env.get('AI_MODEL') || "Qwen/Qwen3-Coder-480B-A35B-Instruct",
     previousAttempt
@@ -395,16 +404,16 @@ async function improvePrompt(
       
       parsedResponse = JSON.parse(jsonContent);
     } catch (parseError) {
-      console.warn('⚠️ Failed to parse Director response as JSON, using original prompt');
-      console.warn('Raw response:', content);
+      console.warn('⚠️ Failed to parse Director response as JSON, using raw text as improved prompt');
       
-      // Fallback: return original prompt if parsing fails
+      // Fallback: Use the entire raw response as the improved prompt
+      // This allows the Director's thinking to still be used even if JSON formatting failed
       return {
-        success: false,
+        success: true,
         originalPrompt: userPrompt,
-        improvedPrompt: userPrompt,
-        improvements: [],
-        error: `Failed to parse Director response: ${parseError}`,
+        improvedPrompt: content, // Use the raw Director output
+        improvements: ['Used Director raw output (JSON parse failed)'],
+        error: undefined,
         model
       };
     }
@@ -492,7 +501,7 @@ async function makeVerdict(
   const {
     maxIterations,
     currentIteration,
-    language = 'typescript',
+    language = 'javascript', // Use JavaScript by default (not TypeScript strict mode)
     model = Deno.env.get('AI_MODEL_DIRECTOR') || Deno.env.get('AI_MODEL') || "Qwen/Qwen3-Coder-480B-A35B-Instruct"
   } = options;
 
@@ -583,7 +592,7 @@ async function makeVerdict(
     }
 
     console.log(`⚖️  Director Verdict: ${verdict.shouldRetry ? '🔄 RETRY' : '🛑 STOP'}`);
-    console.log(`   Reasoning: ${verdict.reasoning.substring(0, 150)}...`);
+    console.log(`   Reasoning: ${verdict.reasoning}`);
 
     return verdict;
 
@@ -715,12 +724,12 @@ export const generateAgentDescription = generateDescription;
  * Quick prompt improvement with defaults
  * 
  * @param userPrompt - The original prompt
- * @param language - Target language (default: typescript)
+ * @param language - Target language (default: javascript)
  * @returns Improved prompt result
  */
 export async function quickImprove(
   userPrompt: string,
-  language: string = 'typescript'
+  language: string = 'javascript'
 ): Promise<PromptImprovementResult> {
   return await improvePromptWithAI(userPrompt, { language });
 }
