@@ -388,7 +388,7 @@ async function dispatchAgents(
   };
   
   try {
-    log('FBI orchestrator started', 'info', { 
+    log('ERA orchestrator started', 'info', { 
       prompt: userPrompt,
       model,
       language,
@@ -451,8 +451,9 @@ async function dispatchAgents(
           iteration
         });
         
-        if (promptImprovement.recommendation) {
-          log(`💡 Director Recommendation: ${promptImprovement.recommendation.substring(0, 150)}...`, 'info');
+        const feedback = promptImprovement.criticalFeedback || promptImprovement.recommendation;
+        if (feedback) {
+          log(`🔴 CRITICAL FEEDBACK: ${feedback.substring(0, 150)}...`, 'info');
         }
       }
       
@@ -476,7 +477,7 @@ async function dispatchAgents(
         extractedCode: generation.code,
         error: generation.error,
         prompt: finalPrompt,
-        recommendation: promptImprovement.recommendation
+        recommendation: promptImprovement.criticalFeedback || promptImprovement.recommendation
       };
       sessionData.attempts?.push(genAttempt);
       
@@ -784,7 +785,7 @@ export async function run(
  * Test the orchestrator with simple prompts (single iteration expected)
  */
 export async function testOrchestratorSimple(): Promise<void> {
-  console.log('🚀 Starting FBI Orchestrator Simple Test (no refinement expected)...\n');
+  console.log('🚀 Starting ERA orchestrator Simple Test (no refinement expected)...\n');
   
   // Initialize Weave for tracing
   console.log('🔍 Initializing Weave tracing...');
@@ -838,8 +839,9 @@ export async function testOrchestratorSimple(): Promise<void> {
         if (result.promptImprovement.improvements && result.promptImprovement.improvements.length > 0) {
           console.log(`  - Improvements applied: ${result.promptImprovement.improvements.length}`);
         }
-        if (result.promptImprovement.recommendation) {
-          console.log(`  - Recommendation: ${result.promptImprovement.recommendation.substring(0, 80)}...`);
+        const testFeedback = result.promptImprovement.criticalFeedback || result.promptImprovement.recommendation;
+        if (testFeedback) {
+          console.log(`  - Critical Feedback: ${testFeedback.substring(0, 80)}...`);
         }
       }
       
@@ -870,7 +872,7 @@ export async function testOrchestratorSimple(): Promise<void> {
  * Test the orchestrator with complex/error-prone prompts (refinement expected)
  */
 export async function testOrchestratorRefinement(): Promise<void> {
-  console.log('🚀 Starting FBI Orchestrator Refinement Test (errors expected, refinement should fix)...\n');
+  console.log('🚀 Starting ERA orchestrator Refinement Test (errors expected, refinement should fix)...\n');
   
   // Initialize Weave for tracing
   console.log('🔍 Initializing Weave tracing...');
@@ -933,7 +935,7 @@ export async function testOrchestratorRefinement(): Promise<void> {
           console.log(`    - Timestamp: ${attempt.timestamp}`);
           
           if (attempt.recommendation) {
-            console.log(`    - 💡 Recommendation: ${attempt.recommendation.substring(0, 100)}...`);
+            console.log(`    - 🔴 Critical Feedback: ${attempt.recommendation.substring(0, 100)}...`);
           }
           
           if (attempt.execution) {
@@ -980,7 +982,7 @@ export async function testOrchestratorRefinement(): Promise<void> {
  */
 export async function testOrchestrator(customPrompts?: string[]): Promise<void> {
   if (customPrompts && customPrompts.length > 0) {
-    console.log('🚀 Starting FBI Orchestrator Test with custom prompts...\n');
+    console.log('🚀 Starting ERA orchestrator Test with custom prompts...\n');
     
     // Initialize Weave for tracing
     console.log('🔍 Initializing Weave tracing...');

@@ -8,7 +8,7 @@
  * - Formatting code with headers
  * 
  * This separates file operations from orchestration logic,
- * making FBI orchestrator usable from CLI, API, tests, or any context.
+ * making ERA orchestrator usable from CLI, API, tests, or any context.
  */
 
 import { exists } from 'https://deno.land/std@0.208.0/fs/mod.ts';
@@ -30,6 +30,8 @@ export interface PrepOptions {
   overwrite?: boolean;
   /** Whether to add AI generation header to code (default: true) */
   addHeader?: boolean;
+  /** Existing agent history to merge with (for continuations) */
+  existingHistory?: AgentCreationHistory;
 }
 
 /**
@@ -41,11 +43,13 @@ export interface PrepResult {
   files: {
     indexFile: string;
     metadataFile: string;
+    iterationFiles?: string[]; // List of saved iteration files
   };
   paths: {
     agentDir: string;
     indexPath: string;
     metadataPath: string;
+    iterationsDir?: string;
   };
   error?: string;
 }
@@ -91,8 +95,9 @@ export function formatAIGeneratedCode(
  * Prepare agent files from orchestrator result
  * 
  * Creates directory structure and writes:
- * - index.ts (formatted agent code)
- * - agent.json (metadata with history)
+ * - index.ts (formatted agent code - latest/best version)
+ * - agent.json (metadata with ALL history)
+ * - iterations/ folder with timestamped snapshots of each attempt
  */
 export async function prepareAgentFiles(
   result: OrchestratorResult,
@@ -101,7 +106,8 @@ export async function prepareAgentFiles(
   const {
     baseDir = 'agents',
     overwrite = true,
-    addHeader = true
+    addHeader = true,
+    existingHistory
   } = options;
 
   const agentName = result.history.agentName;
@@ -136,35 +142,169 @@ export async function prepareAgentFiles(
     } else {
       await Deno.mkdir(agentDir, { recursive: true });
     }
+    
+    // Merge with existing history if this is a continuation
+    let mergedHistory = result.history;
+    if (existingHistory) {
+      console.log(colorize('🔗 Merging with existing agent history...', 'cyan'));
+      
+      // Calculate global attempt numbers for this session
+      const previousTotalAttempts = existingHistory.sessions
+        ? existingHistory.sessions.reduce((sum, s) => sum + s.attempts.length, 0)
+        : (existingHistory.attempts?.length || 0); // Backward compat
+      
+      // Create new session with attempts nested inside
+      const newSessionInfo = {
+        sessionNumber: (existingHistory.sessions?.length || 0) + 1,
+        timestamp: result.history.timestamp,
+        prompt: promptText,
+        attempts: (result.history.attempts || []).map((attempt, idx) => ({
+          ...attempt,
+          attemptNumber: previousTotalAttempts + idx + 1  // Global sequential numbering
+        }))
+      };
+      
+      // Keep original metadata but append new session
+      mergedHistory = {
+        ...existingHistory,
+        // Update these fields with latest run
+        timestamp: result.history.timestamp,
+        finalCode: result.history.finalCode,
+        wasExecuted: result.history.wasExecuted,
+        error: result.history.error,
+        stackTrace: result.history.stackTrace,
+        agentDescription: result.history.agentDescription || existingHistory.agentDescription,
+        
+        // Build sessions array
+        sessions: [
+          ...(existingHistory.sessions || [
+            // If no sessions array yet (old format), convert old data to session format
+            {
+              sessionNumber: 1,
+              timestamp: existingHistory.timestamp,
+              prompt: existingHistory.ogprompt,
+              attempts: existingHistory.attempts || []
+            }
+          ]),
+          newSessionInfo  // Add new session with nested attempts
+        ],
+        
+        // Keep top-level attempts for backward compatibility, but mark as deprecated
+        attempts: [
+          ...(existingHistory.attempts || []),
+          ...newSessionInfo.attempts
+        ]
+      };
+      
+      const totalAttempts = mergedHistory.sessions?.reduce((sum, s) => sum + s.attempts.length, 0) || 0;
+      console.log(colorize(`   Total sessions: ${mergedHistory.sessions?.length || 0}`, 'gray'));
+      console.log(colorize(`   Total attempts: ${totalAttempts}`, 'gray'));
+      console.log(colorize(`   This session: ${newSessionInfo.attempts.length} attempt(s)`, 'gray'));
+    }
+    
+    function colorize(text: string, color: string): string {
+      // Simple fallback if colors not imported
+      return text;
+    }
 
-    // Format the generated code
+    // Create iterations directory for historical snapshots
+    const iterationsDir = join(agentDir, 'iterations');
+    if (!(await exists(iterationsDir))) {
+      await Deno.mkdir(iterationsDir, { recursive: true });
+    }
+
+    // Save each iteration as a timestamped snapshot
+    const iterationFiles: string[] = [];
+    if (mergedHistory.sessions) {
+      // Iterate through sessions and their attempts
+      for (const session of mergedHistory.sessions) {
+        for (const attempt of session.attempts) {
+          if (attempt.extractedCode) {
+            // Create a safe filename from timestamp
+            const timestamp = new Date(attempt.timestamp).getTime();
+            const iterationFilename = `iteration-${attempt.attemptNumber}-${timestamp}.ts`;
+            const iterationPath = join(iterationsDir, iterationFilename);
+            
+            // Format iteration code with metadata header
+            const iterationHeader = `/**
+ * Iteration ${attempt.attemptNumber} (Session ${session.sessionNumber}) - ${attempt.timestamp}
+ * Agent: ${agentName}
+ * Session Prompt: ${session.prompt.substring(0, 100)}${session.prompt.length > 100 ? '...' : ''}
+ * Extraction Success: ${attempt.extractionSuccess}
+ * ${attempt.execution ? `Execution Success: ${attempt.execution.success}` : 'Not executed'}
+ * 
+ * Full Prompt:
+ * ${attempt.prompt ? attempt.prompt.substring(0, 200) + '...' : session.prompt}
+ */
+
+`;
+            
+            const iterationCode = iterationHeader + attempt.extractedCode;
+            await Deno.writeTextFile(iterationPath, iterationCode);
+            
+            iterationFiles.push(`${baseDir}/${agentName}/iterations/${iterationFilename}`);
+          }
+        }
+      }
+    } else if (mergedHistory.attempts) {
+      // Backward compatibility: if no sessions yet, use old attempts array
+      for (const attempt of mergedHistory.attempts) {
+        if (attempt.extractedCode) {
+          const timestamp = new Date(attempt.timestamp).getTime();
+          const iterationFilename = `iteration-${attempt.attemptNumber}-${timestamp}.ts`;
+          const iterationPath = join(iterationsDir, iterationFilename);
+          
+          const iterationHeader = `/**
+ * Iteration ${attempt.attemptNumber} - ${attempt.timestamp}
+ * Agent: ${agentName}
+ * Extraction Success: ${attempt.extractionSuccess}
+ * ${attempt.execution ? `Execution Success: ${attempt.execution.success}` : 'Not executed'}
+ */
+
+`;
+          
+          const iterationCode = iterationHeader + attempt.extractedCode;
+          await Deno.writeTextFile(iterationPath, iterationCode);
+          
+          iterationFiles.push(`${baseDir}/${agentName}/iterations/${iterationFilename}`);
+        }
+      }
+    }
+
+    // Format the final generated code (latest/best version)
+    // Use the user's prompt (not the full continuation context)
+    const displayPrompt = result.prompt;
     const agentCode = addHeader
-      ? formatAIGeneratedCode(agentName, promptText, result.generation.code, {
+      ? formatAIGeneratedCode(agentName, displayPrompt, result.generation.code, {
           model: result.generation.model,
           attempts: result.generation.attempts,
           timestamp: result.history.timestamp
         })
       : result.generation.code;
 
-    // Write index.ts
+    // Write index.ts (current/best version)
     const indexPath = join(agentDir, 'index.ts');
     await Deno.writeTextFile(indexPath, agentCode);
 
-    // Write agent.json (metadata)
+    // Write agent.json (metadata with ALL history - merged if continuation)
     const metadataPath = join(agentDir, 'agent.json');
-    await Deno.writeTextFile(metadataPath, JSON.stringify(result.history, null, 2));
+    await Deno.writeTextFile(metadataPath, JSON.stringify(mergedHistory, null, 2));
+
+    console.log(`📦 Saved ${iterationFiles.length} iteration snapshot(s) to ${baseDir}/${agentName}/iterations/`);
 
     return {
       success: true,
       agentName,
       files: {
         indexFile: `${baseDir}/${agentName}/index.ts`,
-        metadataFile: `${baseDir}/${agentName}/agent.json`
+        metadataFile: `${baseDir}/${agentName}/agent.json`,
+        iterationFiles
       },
       paths: {
         agentDir,
         indexPath,
-        metadataPath
+        metadataPath,
+        iterationsDir
       }
     };
 

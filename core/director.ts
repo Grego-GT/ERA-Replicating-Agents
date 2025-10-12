@@ -61,7 +61,9 @@ export interface PromptImprovementResult {
   improvements: string[];
   /** Analysis of the original prompt */
   analysis?: string;
-  /** Recommendation for next iteration (chain of thought) */
+  /** Critical PR-style feedback that MUST be addressed in next iteration */
+  criticalFeedback?: string;
+  /** @deprecated Use criticalFeedback instead */
   recommendation?: string;
   /** Error message if failed */
   error?: string;
@@ -241,10 +243,10 @@ You MUST respond with ONLY a JSON object (no markdown, no code blocks, just raw 
     "Specified error handling approach"
   ],
   "analysis": "Brief analysis of what was missing or what went wrong",
-  "recommendation": "Strategic recommendation for the next iteration - what should the code generator focus on? This is your chain of thought for continuous improvement."
+  "criticalFeedback": "CRITICAL PR-STYLE FEEDBACK: Strict, actionable requirements that the next AI iteration MUST address. Be harsh and specific about what needs to change. Example: 'REQUIRED: Add input validation for null/undefined. REQUIRED: Fix the async/await pattern - current code will fail. REQUIRED: Output must be valid JSON with success field.' This is mandatory guidance, not a suggestion."
 }
 
-Remember: Your improved prompt should be clear, actionable, and optimized for generating high-quality code. The recommendation helps track your strategic thinking across iterations.`;
+Remember: Your improved prompt should be clear, actionable, and optimized for generating high-quality code. The criticalFeedback is MANDATORY requirements for the next iteration - be strict like a senior code reviewer.`;
 
 // ============================================================================
 // Core Functions
@@ -346,7 +348,8 @@ async function improvePrompt(
       improvedPrompt: string;
       improvements: string[];
       analysis?: string;
-      recommendation?: string;
+      criticalFeedback?: string;
+      recommendation?: string;  // Backward compat
     };
 
     try {
@@ -392,8 +395,11 @@ async function improvePrompt(
     }
 
     console.log(`✅ FBI Director ${isRefinement ? 'refined' : 'improved'} prompt (${parsedResponse.improvements.length} improvements)`);
-    if (parsedResponse.recommendation) {
-      console.log(`💡 Recommendation: ${parsedResponse.recommendation.substring(0, 100)}...`);
+    
+    // Use criticalFeedback (new) or fallback to recommendation (old)
+    const feedback = parsedResponse.criticalFeedback || parsedResponse.recommendation;
+    if (feedback) {
+      console.log(`🔴 CRITICAL FEEDBACK: ${feedback.substring(0, 120)}...`);
     }
 
     return {
@@ -402,7 +408,8 @@ async function improvePrompt(
       improvedPrompt: parsedResponse.improvedPrompt,
       improvements: parsedResponse.improvements,
       analysis: parsedResponse.analysis,
-      recommendation: parsedResponse.recommendation,
+      criticalFeedback: parsedResponse.criticalFeedback,
+      recommendation: parsedResponse.recommendation,  // Keep for backward compat
       model
     };
 

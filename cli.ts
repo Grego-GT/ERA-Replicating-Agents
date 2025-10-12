@@ -8,6 +8,7 @@
 import { parse } from 'https://deno.land/std@0.208.0/flags/mod.ts';
 import { exists } from 'https://deno.land/std@0.208.0/fs/mod.ts';
 import { join } from 'https://deno.land/std@0.208.0/path/mod.ts';
+import { Input, Select } from '@cliffy/prompt';
 import { run as orchestratorRun } from './core/fbi.ts';
 import { prepareAgentFiles } from './core/prep.ts';
 import { simpleChat } from './utils/wandb/index.ts';
@@ -80,6 +81,59 @@ async function select(message: string, choices: string[]): Promise<string> {
   }
   console.log(colorize('Invalid choice, please try again.', 'red'));
   return await select(message, choices);
+}
+
+// ============================================================================
+// Agent Selection
+// ============================================================================
+
+/**
+ * Get list of existing agents
+ */
+async function getExistingAgents(): Promise<string[]> {
+  const agentsDir = join(Deno.cwd(), 'agents');
+  
+  if (!(await exists(agentsDir))) {
+    return [];
+  }
+  
+  const agents: string[] = [];
+  for await (const entry of Deno.readDir(agentsDir)) {
+    if (entry.isDirectory) {
+      agents.push(entry.name);
+    }
+  }
+  
+  return agents.sort();
+}
+
+/**
+ * Interactive agent name prompt with autocomplete from existing agents
+ */
+async function promptAgentName(suggestedName: string): Promise<string> {
+  const existingAgents = await getExistingAgents();
+  
+  if (existingAgents.length === 0) {
+    // No existing agents, use simple input
+    return await Input.prompt({
+      message: 'Agent name:',
+      default: suggestedName,
+      hint: 'Press Enter to use suggested name'
+    });
+  }
+  
+  // Use Input with suggestions instead of Select for better typing experience
+  return await Input.prompt({
+    message: 'Agent name:',
+    default: suggestedName,
+    suggestions: [
+      suggestedName,
+      ...existingAgents
+    ],
+    list: true,
+    info: true,
+    hint: '↑↓ for suggestions, or type custom name'
+  });
 }
 
 // ============================================================================
@@ -161,18 +215,96 @@ main();
 async function createAgentWithAI(
   name: string,
   promptText: string,
-  maxIterations: number = 3
-): Promise<void> {
-  console.log(colorize(`\n🤖 Creating agent: ${colorize(name, 'bold')}`, 'green'));
+  maxIterations: number = 3,
+  previousResult?: any
+): Promise<any> {
+  // Check if agent already exists
+  const agentDir = join(Deno.cwd(), 'agents', name);
+  const agentJsonPath = join(agentDir, 'agent.json');
+  const indexTsPath = join(agentDir, 'index.ts');
+  
+  let existingHistory: any = null;
+  let existingCode = '';
+  let isContinuation = false;
+  
+  if (await exists(agentDir) && await exists(agentJsonPath)) {
+    try {
+      // Load existing agent context
+      const jsonContent = await Deno.readTextFile(agentJsonPath);
+      existingHistory = JSON.parse(jsonContent);
+      
+      if (await exists(indexTsPath)) {
+        existingCode = await Deno.readTextFile(indexTsPath);
+      }
+      
+      isContinuation = true;
+      console.log(colorize(`\n📂 Found existing agent: ${colorize(name, 'bold')}`, 'cyan'));
+      console.log(colorize(`   Previous attempts: ${existingHistory.attempts?.length || 0}`, 'gray'));
+      console.log(colorize(`   Continuing with new iteration...\n`, 'cyan'));
+    } catch (error) {
+      console.log(colorize(`   ⚠️  Could not load existing agent, creating fresh`, 'yellow'));
+    }
+  }
+  
+  console.log(colorize(`\n🤖 ${isContinuation ? 'Continuing' : 'Creating'} agent: ${colorize(name, 'bold')}`, 'green'));
   console.log(colorize(`💬 Prompt: ${colorize(promptText, 'bold')}`, 'blue'));
   console.log(colorize(`🔄 Max iterations: ${colorize(maxIterations.toString(), 'bold')}`, 'gray'));
   console.log(
-    colorize('\n⏳ Calling FBI orchestrator (AI code generation + execution)...\n', 'cyan')
+    colorize('\n⏳ Calling ERA orchestrator (AI code generation + execution)...\n', 'cyan')
   );
 
   try {
-    // Call the FBI orchestrator (generation + execution with retry/refinement)
-    const result = await orchestratorRun(promptText, {
+    // Build context for continuation if agent exists
+    let contextualPrompt = promptText;
+    let previousAttemptContext: any = undefined;
+    
+    if (isContinuation && existingHistory && existingCode) {
+      // Build rich context from existing agent
+      contextualPrompt = `
+# Agent Continuation Context
+
+## Original Agent
+Name: ${name}
+Original Prompt: ${existingHistory.ogprompt}
+Description: ${existingHistory.agentDescription || 'N/A'}
+Total Previous Attempts: ${existingHistory.attempts?.length || 0}
+
+## Current Working Code
+The agent currently has working code that successfully executes.
+
+## Latest Successful Version
+\`\`\`typescript
+${existingCode.substring(0, 1000)}${existingCode.length > 1000 ? '\n... (truncated for context)' : ''}
+\`\`\`
+
+## New User Request
+${promptText}
+
+## Task
+Generate an improved version of this agent that:
+1. Maintains all existing functionality that works
+2. Addresses the new user request: "${promptText}"
+3. Builds upon the previous successful code
+4. Preserves the core purpose: "${existingHistory.ogprompt}"
+
+Please generate the complete, improved agent code.
+`;
+
+      // Get the last successful attempt for Director context
+      const lastAttempt = existingHistory.attempts?.[existingHistory.attempts.length - 1];
+      if (lastAttempt && lastAttempt.execution?.success) {
+        previousAttemptContext = {
+          prompt: lastAttempt.prompt || existingHistory.ogprompt,
+          code: existingCode,
+          executionOutput: lastAttempt.execution.output,
+          executionError: undefined,
+          errorType: undefined
+        };
+      }
+    }
+    
+    // Call the ERA orchestrator (generation + execution with retry/refinement)
+    const result = await orchestratorRun(isContinuation ? contextualPrompt : promptText, {
       maxRetries: 3,
       maxIterations,
       agentName: name,
@@ -210,7 +342,9 @@ async function createAgentWithAI(
 
     // Prepare agent files using FBI prep module
     console.log(colorize('\n📦 Preparing agent files...', 'gray'));
-    const prepResult = await prepareAgentFiles(result);
+    const prepResult = await prepareAgentFiles(result, {
+      existingHistory: existingHistory // Pass existing history for merging if continuation
+    });
 
     if (!prepResult.success) {
       throw new Error(`Failed to prepare files: ${prepResult.error}`);
@@ -249,6 +383,8 @@ async function createAgentWithAI(
       colorize(`\n   Run it with: ${colorize(`deno run ${prepResult.files.indexFile}`, 'bold')}`, 'gray')
     );
     console.log(colorize('\n   Done! ✨\n', 'green'));
+    
+    return result; // Return for potential refinement
   } catch (error) {
     const err = error as Error;
     console.log(colorize(`\n❌ AI code generation failed: ${err.message}`, 'red'));
@@ -262,6 +398,62 @@ async function createAgentWithAI(
 
     // Fallback to simple generation
     await createAgentSimple(name, promptText);
+    return null;
+  }
+}
+
+/**
+ * Interactive refinement loop - allows user to provide improvement feedback
+ * after successful generation
+ */
+async function refineAgentInteractive(
+  name: string,
+  previousResult: any
+): Promise<void> {
+  console.log(colorize('\n💡 Refinement Mode', 'cyan'));
+  console.log(colorize('   You can now improve the generated code based on your feedback.\n', 'gray'));
+  
+  const wantsRefinement = await prompt('Would you like to refine/improve this agent? (y/n)');
+  
+  if (wantsRefinement.toLowerCase() !== 'y') {
+    console.log(colorize('\n✅ Agent finalized!\n', 'green'));
+    return;
+  }
+  
+  // Get improvement prompt from user
+  const improvementPrompt = await prompt(
+    '\nWhat would you like to improve? (describe your refinement goals):'
+  );
+  
+  if (!improvementPrompt.trim()) {
+    console.log(colorize('\n⚠️  No improvement prompt provided, skipping refinement.\n', 'yellow'));
+    return;
+  }
+  
+  // Build refinement context from previous result
+  const refinementContext = `
+Original goal: ${previousResult.prompt}
+Previous code successfully generated and executed.
+
+User feedback for improvement:
+${improvementPrompt}
+
+Please generate an improved version of the code that addresses this feedback while maintaining the core functionality.
+`;
+  
+  console.log(colorize('\n🔄 Refining agent with your feedback...\n', 'cyan'));
+  
+  // Call orchestrator again with refinement context
+  const refinedResult = await createAgentWithAI(
+    name,
+    refinementContext,
+    3, // Allow iterations for refinement
+    previousResult
+  );
+  
+  if (refinedResult) {
+    // Ask if they want to refine again
+    await refineAgentInteractive(name, refinedResult);
   }
 }
 
@@ -326,7 +518,6 @@ async function startInteractiveMode(): Promise<void> {
   let continueLoop = true;
 
   while (continueLoop) {
-    console.log(colorize('━'.repeat(60), 'gray'));
     console.log(colorize('\n✨ Create an Agent', 'cyan'));
     console.log(); // Empty line for spacing
 
@@ -346,15 +537,20 @@ async function startInteractiveMode(): Promise<void> {
     console.log(); // Empty line for spacing
     const suggestedSlug = await generateSlugFromPrompt(promptText);
     
-    // Get agent name with AI-generated suggestion
-    const name = await prompt('Agent name:', suggestedSlug);
-    if (name.trim().length === 0) {
+    // Get agent name with interactive selector (shows existing agents)
+    const name = await promptAgentName(suggestedSlug);
+    if (!name || name.trim().length === 0) {
       console.log(colorize('❌ Agent name cannot be empty!', 'red'));
       continue;
     }
 
     // Create the agent
-    await createAgentWithAI(name, promptText);
+    const result = await createAgentWithAI(name, promptText);
+    
+    // If successful, offer refinement
+    if (result && result.success) {
+      await refineAgentInteractive(name, result);
+    }
     
     // Ask if user wants to create another agent
     console.log(colorize('─'.repeat(60), 'gray'));
@@ -420,22 +616,32 @@ function displayHelp(): void {
   console.log(colorize('Interactive Mode Features:', 'yellow'));
   console.log('  • Streamlined UX - describe what you want first');
   console.log('  • AI-powered agent name suggestions using Llama-3.1-8B');
-  console.log('  • Smart defaults - just press Enter to accept suggestions\n');
+  console.log('  • Smart defaults - just press Enter to accept suggestions');
+  console.log('  • 🆕 Interactive refinement - improve generated code with natural language\n');
   console.log(colorize('Commands:', 'yellow'));
   console.log('  create <name>           Create a new agent');
   console.log('  help                    Show this help message\n');
   console.log(colorize('Options:', 'yellow'));
   console.log('  -p, --prompt <text>     Agent prompt/instructions (required)\n');
   console.log(colorize('Examples:', 'yellow'));
-  console.log('  # Interactive mode (recommended) - with AI name suggestions');
+  console.log('  # Interactive mode (recommended) - with AI name suggestions & refinement');
   console.log('  deno task cli\n');
   console.log('  # AI-powered generation (default, 3 iterations)');
   console.log('  deno task cli:create calculator -p "Create a calculator that adds two numbers"\n');
   console.log('  # With custom iterations (refinement retries)');
   console.log('  deno task cli:create factorial -p "Calculate factorial" --iterations 5\n');
-  console.log(colorize('About Iterations:', 'yellow'));
+  console.log(colorize('About Iterations & Refinement:', 'yellow'));
   console.log('  The FBI Director will retry code generation + execution up to N times.');
-  console.log('  Each retry refines the prompt based on previous errors.\n');
+  console.log('  Each retry refines the prompt based on previous errors.');
+  console.log('  After successful generation, you can interactively refine the code');
+  console.log('  with natural language feedback (e.g., "add error handling", "make it faster").\n');
+  console.log(colorize('File Organization:', 'yellow'));
+  console.log('  agents/<name>/');
+  console.log('    ├── index.ts              # Latest/best version (run this)');
+  console.log('    ├── agent.json            # Metadata with full history');
+  console.log('    └── iterations/           # Timestamped snapshots of each attempt');
+  console.log('          ├── iteration-1-[timestamp].ts');
+  console.log('          └── iteration-2-[timestamp].ts\n');
   console.log(colorize('Requirements for AI generation:', 'yellow'));
   console.log('  - WANDB_API_KEY in .env (for code generation & name suggestions)');
   console.log('  - DAYTONA_API_KEY in .env (for code validation)\n');

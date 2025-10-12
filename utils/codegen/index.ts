@@ -305,7 +305,7 @@ Generate clean, TypeScript-compliant code that will execute without errors.`;
 }
 
 // NOTE: generateAndExecute and testCodeGen have been removed
-// Use FBI orchestrator instead: import { orchestrate } from '../core/fbi.ts'
+// Use ERA orchestrator instead: import { orchestrate } from '../core/fbi.ts'
 // Run tests with: deno task test
 
 

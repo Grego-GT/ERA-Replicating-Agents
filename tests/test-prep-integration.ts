@@ -1,7 +1,7 @@
 /**
  * Test: FBI Prep Integration
  * 
- * Demonstrates how the new architecture allows FBI orchestrator
+ * Demonstrates how the new architecture allows ERA orchestrator
  * to be used from different contexts (tests, APIs, CLI, etc.)
  * without being coupled to file I/O operations.
  */
@@ -28,7 +28,7 @@ export async function testSeparateOrchestrateAndPrep(): Promise<void> {
   await weave.init();
   
   // Step 1: Run orchestrator (no file I/O)
-  console.log('📍 Step 1: Running FBI orchestrator (no file operations)...');
+  console.log('📍 Step 1: Running ERA orchestrator (no file operations)...');
   const result = await orchestrate('Create a function that calculates fibonacci(10)', {
     agentName: 'test-fibonacci',
     maxIterations: 1
@@ -66,7 +66,7 @@ export async function testSeparateOrchestrateAndPrep(): Promise<void> {
 // ============================================================================
 
 /**
- * Shows how you can use FBI orchestrator in an API context
+ * Shows how you can use ERA orchestrator in an API context
  * where you want to return results but not save files.
  * 
  * Example: A web API that validates agent code on-demand

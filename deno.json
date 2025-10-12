@@ -66,7 +66,8 @@
     "@std/dotenv": "jsr:@std/dotenv",
     "@std/path": "jsr:@std/path",
     "@std/fs": "jsr:@std/fs",
-    "@std/flags": "jsr:@std/flags"
+    "@std/flags": "jsr:@std/flags",
+    "@cliffy/prompt": "jsr:@cliffy/prompt@^1.0.0-rc.5"
   },
   "experimental": {
     "unstable-node-globals": true,
