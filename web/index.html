@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>AgFactory - AI Agent Creator</title>
+    <title>ERA - AI Agent Creator</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -730,11 +730,11 @@
           reconnectAttempts = 0; // Reset reconnect counter
           
           writeHTML('<span style="color: #50fa7b;">╔════════════════════════════════════════════════════════════════╗</span>');
-          writeHTML('<span style="color: #50fa7b;">║              🏭  AgFactory Web Terminal                        ║</span>');
-          writeHTML('<span style="color: #50fa7b;">║              AI Agent Creator - v1.0.0                         ║</span>');
+          writeHTML('<span style="color: #50fa7b;">║              🏭  ERA Web Terminal                              ║</span>');
+          writeHTML('<span style="color: #50fa7b;">║              Emergent Replicating Agents - v1.0.0              ║</span>');
           writeHTML('<span style="color: #50fa7b;">╚════════════════════════════════════════════════════════════════╝</span>');
           writeLine('');
-          writeLine('✅ Connected! Starting AgFactory CLI...', '#8be9fd');
+          writeLine('✅ Connected! Starting ERA CLI...', '#8be9fd');
           writeLine('💡 Type your response and press Enter. Use Ctrl+C to interrupt.', '#888');
           writeLine('');
 
@@ -744,7 +744,7 @@
               ws.send(JSON.stringify({ type: 'ping' }));
               console.log('💓 Heartbeat sent');
             }
-          }, 30000); // Every 30 seconds
+          }, 15000); // Every 15 seconds (Fly.io timeout is ~20s)
 
           // Start the CLI
           ws.send(JSON.stringify({ type: 'start_cli' }));
@@ -1013,7 +1013,7 @@
       });
 
       // Initialize
-      console.log('🏭 AgFactory Web UI Loading...');
+      console.log('🏭 ERA Web UI Loading...');
       connectWebSocket();
       loadFiles();
     </script>

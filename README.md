@@ -60,7 +60,7 @@ cd ERA
 ## 📦 Project Structure
 
 ```
-AgFactory/
+ERA/
 ├── core/                    # 🧠 Core FBI Orchestration System
 │   ├── fbi.ts              # Main orchestrator
 │   ├── director.ts         # AI decision maker & prompt improvement
@@ -320,6 +320,7 @@ ERA supports per-component model and provider configuration. You can mix differe
 **Components:** `director`, `codegen`, `fbi`, `sluggen`, `promoter`
 
 **Configuration Priority:**
+
 - **Models**: `AI_MODEL_<COMPONENT>` → `AI_MODEL` → `Qwen/Qwen3-Coder-480B-A35B-Instruct`
 - **URLs**: `INFERENCE_URL_<COMPONENT>` → `INFERENCE_URL` → `https://api.inference.wandb.ai/v1/chat/completions`
 - **Keys**: `INFERENCE_API_KEY_<COMPONENT>` → `INFERENCE_API_KEY` → `WANDB_API_KEY`

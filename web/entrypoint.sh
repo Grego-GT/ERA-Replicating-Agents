@@ -4,7 +4,7 @@ set -e
 # This script runs on container startup
 # It handles seeding the persistent volume with demo agents if needed
 
-echo "🚀 AgFactory starting..."
+echo "🚀 ERA starting..."
 
 # Check if agents directory is empty (first run with new volume)
 if [ -z "$(ls -A /app/agents 2>/dev/null)" ]; then

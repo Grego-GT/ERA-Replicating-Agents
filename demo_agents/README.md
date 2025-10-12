@@ -4,7 +4,7 @@ This directory contains example agents that are used to seed new deployments.
 
 ## Purpose
 
-- **Read-only templates**: These agents demonstrate AgFactory capabilities
+- **Read-only templates**: These agents demonstrate ERA capabilities
 - **Auto-seeding**: On first deployment, these are copied to `/app/agents/`
 - **Examples included**:
   - `jannn/` - Example agent

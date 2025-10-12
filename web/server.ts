@@ -1,5 +1,5 @@
 /**
- * Deno web server for AgFactory UI
+ * Deno web server for ERA (Emergent Replicating Agents)
  * Serves static files, provides API endpoints, and WebSocket for terminal
  */
 
@@ -47,9 +47,9 @@ function broadcastUserCount() {
 // Periodic heartbeat to keep user count updated and clean up stale connections
 setInterval(() => {
   broadcastUserCount();
-}, 30000); // Every 30 seconds
+}, 15000); // Every 15 seconds (Fly.io WebSocket timeout is ~20s)
 
-console.log("⏰ User count heartbeat started (30s interval)");
+console.log("⏰ User count heartbeat started (15s interval)");
 
 const MIME_TYPES: Record<string, string> = {
   ".html": "text/html",
@@ -418,7 +418,7 @@ async function handler(req: Request): Promise<Response> {
       const requestedPath = searchParams.get("path") || ".";
       
       try {
-        // Both dev and prod: show parent directory (/app or AgFactory/)
+        // Both dev and prod: show parent directory (/app or project root)
         const basePath = join(Deno.cwd(), "..");
         const targetPath = requestedPath === "." || requestedPath === ".." 
           ? basePath 
@@ -570,7 +570,7 @@ async function handler(req: Request): Promise<Response> {
   return await serveFile(filePath);
 }
 
-console.log(`🏭 AgFactory Web Server starting...`);
+console.log(`🏭 ERA Web Server starting...`);
 console.log(`   Mode: ${isProduction ? "PRODUCTION" : "DEVELOPMENT"}`);
 console.log(`   Port: ${port}`);
 console.log(`   URL:  ${isProduction ? "https://agfactory-web.fly.dev" : `http://localhost:${port}`}`);
