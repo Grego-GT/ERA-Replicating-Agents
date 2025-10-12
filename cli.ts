@@ -439,6 +439,46 @@ Please generate the complete, improved agent code.
     );
     console.log(colorize("\n   Done! ✨\n", "green"));
 
+    // Preview execution: Run the generated agent to show its output
+    if (result.execution.success && result.execution.output) {
+      console.log(colorize("─".repeat(60), "gray"));
+      console.log(colorize("🎬 Live Preview - Agent Output:", "cyan"));
+      console.log(colorize("─".repeat(60), "gray"));
+      
+      // Filter out infrastructure noise (weave errors, netrc warnings, etc)
+      let output = result.execution.output.trim();
+      
+      // Remove common infrastructure error patterns
+      const noisyPatterns = [
+        /Error parsing netrc file[\s\S]*?path: '\/home\/daytona\/\.netrc'\s*}/g,
+        /\[Weave\] Failed to initialize:[\s\S]*?(?=\n\n|\n[A-Z]|$)/g,
+        /wandb API key not found\.[\s\S]*?(?=\n\n|\n[A-Z]|$)/g,
+        /npm.*added.*packages.*in.*s/g,
+      ];
+      
+      for (const pattern of noisyPatterns) {
+        output = output.replace(pattern, '');
+      }
+      
+      // Clean up extra whitespace
+      output = output.replace(/\n{3,}/g, '\n\n').trim();
+      
+      if (output.length > 0) {
+        // Limit output to reasonable size for preview
+        const maxPreviewLength = 1000;
+        const previewOutput = output.length > maxPreviewLength 
+          ? output.substring(0, maxPreviewLength) + "\n\n   ... (output truncated, run agent to see full output)"
+          : output;
+        
+        console.log(previewOutput);
+      } else {
+        console.log(colorize("   (Agent executed successfully but produced no visible output)", "gray"));
+      }
+      
+      console.log(colorize("─".repeat(60), "gray"));
+      console.log(colorize("💡 This is what your agent produced during validation\n", "gray"));
+    }
+
     return result; // Return for potential refinement
   } catch (error) {
     const err = error as Error;
@@ -575,6 +615,10 @@ async function startInteractiveMode(): Promise<void> {
       message: "Choose a template or define your own:",
       options: [
         {
+          name: "🔢 FizzBuzz Solver (Simple Demo)",
+          value: "fizzbuzz",
+        },
+        {
           name: "🎭 Joke Generator (WandbChat Demo)",
           value: "jokemeister",
         },
@@ -602,7 +646,14 @@ async function startInteractiveMode(): Promise<void> {
     let suggestedName = "";
 
     // Handle template selection
-    if (quickStartChoice === "jokemeister") {
+    if (quickStartChoice === "fizzbuzz") {
+      promptText =
+        "Create a FizzBuzz solver that prints numbers 1 to 100, replacing multiples of 3 with 'Fizz', multiples of 5 with 'Buzz', and multiples of both with 'FizzBuzz'. Output each result on a new line.";
+      suggestedName = "fizzbuzz-solver";
+      console.log(colorize("\n🔢 FizzBuzz Solver Template", "cyan"));
+      console.log(colorize("   Demonstrates: Basic code generation and execution", "gray"));
+      console.log(colorize(`   Prompt: "${promptText.substring(0, 80)}..."`, "gray"));
+    } else if (quickStartChoice === "jokemeister") {
       promptText =
         "Create a joke-telling agent that uses wandbChat to generate jokes with step-by-step reasoning and weave tracing with operation jokemeister:tell_joke";
       suggestedName = "jokemeister";
@@ -837,9 +888,11 @@ function displayHelp(): void {
   console.log(colorize("Examples:", "yellow"));
   console.log("  # Interactive mode (recommended) - with quick-start templates!");
   console.log("  deno task cli");
-  console.log("  # → Choose from: Joke Generator, Web Search, AI Browser, Multi-Agent, or Custom\n");
+  console.log("  # → Choose from: FizzBuzz, Joke Generator, Web Search, AI Browser, Multi-Agent, or Custom\n");
 
   console.log(colorize("Quick Start:", "yellow"));
+  console.log("  # Create FizzBuzz solver (simple demo)");
+  console.log("  deno task start:fizzbuzz\n");
   console.log("  # Create joke-telling agent (WandbChat + Weave demo)");
   console.log("  deno task start:jokemeister\n");
   console.log("  # Create web search agent (Tavily demo)");

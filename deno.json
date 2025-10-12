@@ -18,6 +18,7 @@
     "cli": "deno run --allow-read --allow-write --allow-env --allow-net --allow-sys cli.ts",
     "cli:create": "deno run --allow-read --allow-write --allow-env --allow-net --allow-sys cli.ts create",
     "cli:promote": "deno run --allow-read --allow-write --allow-env --allow-net --allow-sys cli.ts promote",
+    "start:fizzbuzz": "deno run --allow-read --allow-write --allow-env --allow-net --allow-sys cli.ts create fizzbuzz-solver --prompt 'Create a FizzBuzz solver that prints numbers 1 to 100'",
     "start:jokemeister": "deno run --allow-read --allow-write --allow-env --allow-net --allow-sys cli.ts create jokemeister --prompt 'Create a joke-telling agent that uses wandbChat to generate jokes with step-by-step reasoning and weave tracing'",
     "start:tavily": "deno run --allow-read --allow-write --allow-env --allow-net --allow-sys cli.ts create web-researcher --prompt 'Create a web search agent that uses tavilySearch to search for information and display results'",
     "start:browserbase": "deno run --allow-read --allow-write --allow-env --allow-net --allow-sys cli.ts create ai-browser --prompt 'Create an AI web browser agent using Stagehand that navigates to docs.stagehand.dev and extracts information'",

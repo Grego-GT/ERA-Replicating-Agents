@@ -541,8 +541,46 @@ async function dispatchAgents(
         iteration
       });
       
-      // Inject utilities (wandb, weave) into generated code before execution
-      const codeWithUtils = await injectUtilities(generation.code, ['wandb', 'weave']);
+      // Auto-detect which utilities are used in the generated code
+      const detectedUtilities: string[] = [];
+      
+      // Check for wandb usage
+      if (generation.code.includes('wandbChat') || generation.code.includes('simpleChat')) {
+        detectedUtilities.push('wandb');
+      }
+      
+      // Check for weave usage (or always include for tracing)
+      if (generation.code.includes('initWeave') || generation.code.includes('createTracedOp') || detectedUtilities.length > 0) {
+        detectedUtilities.push('weave');
+      }
+      
+      // Check for tavily usage
+      if (generation.code.includes('tavilySearch') || generation.code.includes('tavilyQuickSearch')) {
+        detectedUtilities.push('tavily');
+      }
+      
+      // Check for browserbase/stagehand usage
+      if (generation.code.includes('createStagehand') || generation.code.includes('Stagehand') || 
+          generation.code.includes('extractFromPage') || generation.code.includes('observePage') || generation.code.includes('actOnPage')) {
+        detectedUtilities.push('browserbase');
+      }
+      
+      // Check for mastra usage
+      if (generation.code.includes('createMastra') || generation.code.includes('createAgent') || 
+          generation.code.includes('createWorkflow') || generation.code.includes('executeAgent') || generation.code.includes('executeWorkflow')) {
+        detectedUtilities.push('mastra');
+      }
+      
+      // Always include weave if we have any utilities (for tracing)
+      if (detectedUtilities.length > 0 && !detectedUtilities.includes('weave')) {
+        detectedUtilities.push('weave');
+      }
+      
+      // Inject detected utilities into generated code before execution
+      if (detectedUtilities.length > 0) {
+        log(`Injecting utilities: ${detectedUtilities.join(', ')}`, 'info');
+      }
+      const codeWithUtils = await injectUtilities(generation.code, detectedUtilities);
       
       // Store the injected code in session data (this is what gets saved to disk)
       sessionData.finalCode = codeWithUtils;

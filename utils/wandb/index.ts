@@ -48,6 +48,7 @@ export interface ChatOptions {
 interface WandbConfig {
   apiKey: string;
   project?: string;
+  inferenceUrl: string;
 }
 
 /**
@@ -96,17 +97,18 @@ export interface ChatWithHistoryResponse {
 /**
  * Get Wandb API configuration from environment
  * 
- * @returns Config object with apiKey and project
+ * @returns Config object with apiKey, project, and inferenceUrl
  */
 function getWandbConfig(): WandbConfig {
   const apiKey = Deno.env.get('WANDB_API_KEY');
   const project = Deno.env.get('WANDB_PROJECT');
+  const inferenceUrl = Deno.env.get('INFERENCE_URL') || 'https://api.inference.wandb.ai/v1/chat/completions';
   
   if (!apiKey) {
     throw new Error('WANDB_API_KEY not found in environment');
   }
   
-  return { apiKey, project };
+  return { apiKey, project, inferenceUrl };
 }
 
 /**
@@ -133,7 +135,7 @@ async function llmConversation({
   console.log(`🤖 Wandb API call starting (model: ${model})...`);
   
   try {
-    const { apiKey, project } = getWandbConfig();
+    const { apiKey, project, inferenceUrl } = getWandbConfig();
     
     // Build messages array
     let fullMessages: ChatMessage[] = [...messages];
@@ -166,7 +168,7 @@ async function llmConversation({
     }
     
     // Make the API call
-    const response = await fetch('https://api.inference.wandb.ai/v1/chat/completions', {
+    const response = await fetch(inferenceUrl, {
       method: 'POST',
       headers,
       body: JSON.stringify(body)
@@ -318,7 +320,7 @@ async function streamLLMResponse(options: ChatOptions): Promise<ReadableStream<U
   await sema.acquire();
   
   try {
-    const { apiKey, project } = getWandbConfig();
+    const { apiKey, project, inferenceUrl } = getWandbConfig();
     
     const body: Record<string, unknown> = {
       ...options,
@@ -334,7 +336,7 @@ async function streamLLMResponse(options: ChatOptions): Promise<ReadableStream<U
       headers['OpenAI-Project'] = project;
     }
     
-    const response = await fetch('https://api.inference.wandb.ai/v1/chat/completions', {
+    const response = await fetch(inferenceUrl, {
       method: 'POST',
       headers,
       body: JSON.stringify(body)

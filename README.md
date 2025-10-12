@@ -95,6 +95,7 @@ deno task cli
 This starts an interactive prompt with **Quick Start Templates**:
 
 1. **Choose a template** or define your own:
+   - 🔢 **FizzBuzz Solver** - Simple code generation demo
    - 🎭 **Joke Generator** - WandbChat + Weave tracing demo
    - 🔍 **Web Search Agent** - Tavily search demo
    - 🌐 **AI Web Browser** - Browserbase/Stagehand AI browsing demo
@@ -145,6 +146,9 @@ deno task cli:promote jokemeister            # Execute
 Try these pre-configured examples:
 
 ```bash
+# FizzBuzz Solver (simple demo)
+deno task start:fizzbuzz
+
 # Joke Generator (WandbChat + Weave demo)
 deno task start:jokemeister
 
