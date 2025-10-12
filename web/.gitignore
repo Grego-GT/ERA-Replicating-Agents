@@ -1,0 +1,21 @@
+# Deno
+.deno/
+deno.lock
+
+# Build output
+dist/
+*.js.map
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
