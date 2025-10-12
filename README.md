@@ -5,7 +5,8 @@
 
 <img width="256" height="256" alt="era-logo" src="https://github.com/user-attachments/assets/ef2318fa-3f69-42ac-950b-c6765756cd51" />
 
-[![Promo](https://github.com/user-attachments/assets/7a153774-7d1d-4530-bcc7-1c6d798c701e)](https://www.youtube.com/watch?v=XFBR9owMNFQ)
+https://github.com/user-attachments/assets/0492637b-1760-4870-8a4a-53f32733b3e9
+
 
 [![Watch the demo](https://img.youtube.com/vi/XFBR9owMNFQ/0.jpg)](https://www.youtube.com/watch?v=XFBR9owMNFQ)
 
