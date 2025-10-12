@@ -110,12 +110,13 @@ function getWandbConfig(): WandbConfig {
 }
 
 /**
- * Chat with an LLM using Wandb Inference API (internal implementation)
+ * LLM Conversation Handler
+ * Sends messages to Wandb Inference API and gets completion
  * 
  * @param options - Chat options
  * @returns The completion response
  */
-async function chatImpl({
+async function llmConversation({
   model = "Qwen/Qwen3-Coder-480B-A35B-Instruct",
   messages = [],
   systemPrompt = null,
@@ -192,19 +193,20 @@ async function chatImpl({
  * Chat with an LLM using Wandb Inference API
  * Traced with Weave for observability
  * 
- * @param options - Chat options (see chatImpl for details)
+ * @param options - Chat options (see llmConversation for details)
  * @returns The completion response
  */
-export const chat = weave.op(chatImpl);
+export const chat = weave.op(llmConversation);
 
 /**
- * Simplified chat function that returns just the message content (internal implementation)
+ * Quick Ask LLM
+ * Single turn conversation - ask one question, get one answer
  * 
  * @param userMessage - The user's message
  * @param options - Optional parameters
  * @returns The assistant's response content
  */
-async function simpleChatImpl(userMessage: string, options: ChatOptions = {}): Promise<string> {
+async function quickAskLLM(userMessage: string, options: ChatOptions = {}): Promise<string> {
   const messages: ChatMessage[] = [
     { role: 'user', content: userMessage }
   ];
@@ -221,17 +223,18 @@ async function simpleChatImpl(userMessage: string, options: ChatOptions = {}): P
  * Simplified chat function that returns just the message content
  * Traced with Weave for observability
  */
-export const simpleChat = weave.op(simpleChatImpl);
+export const simpleChat = weave.op(quickAskLLM);
 
 /**
- * Chat with conversation history (internal implementation)
+ * Continue Multi-Turn Conversation
+ * Maintains conversation context across multiple exchanges
  * 
  * @param conversationHistory - Array of previous messages
  * @param newMessage - New user message to add
  * @param options - Optional parameters
  * @returns Response with updated conversation and assistant message
  */
-async function chatWithHistoryImpl(
+async function continueConversation(
   conversationHistory: ChatMessage[] = [], 
   newMessage: string, 
   options: ChatOptions = {}
@@ -262,15 +265,16 @@ async function chatWithHistoryImpl(
  * Chat with conversation history
  * Traced with Weave for observability
  */
-export const chatWithHistory = weave.op(chatWithHistoryImpl);
+export const chatWithHistory = weave.op(continueConversation);
 
 /**
- * Stream chat completions (if supported by the API) (internal implementation)
+ * Stream LLM Response
+ * Get streaming chat completions for real-time token delivery
  * 
  * @param options - Same as chat() options plus stream: true
  * @returns Stream of completion chunks
  */
-async function streamChatImpl(options: ChatOptions): Promise<ReadableStream<Uint8Array> | null> {
+async function streamLLMResponse(options: ChatOptions): Promise<ReadableStream<Uint8Array> | null> {
   // Acquire semaphore token
   await sema.acquire();
   
@@ -320,7 +324,7 @@ async function streamChatImpl(options: ChatOptions): Promise<ReadableStream<Uint
  * Stream chat completions
  * Traced with Weave for observability
  */
-export const streamChat = weave.op(streamChatImpl);
+export const streamChat = weave.op(streamLLMResponse);
 
 /**
  * Run a test chat to verify the integration works

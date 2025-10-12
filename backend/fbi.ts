@@ -16,6 +16,7 @@ import "jsr:@std/dotenv/load"; // needed for deno run; not req for smallweb or v
 import { generateCode } from './codegen.ts';
 import { runCode, type CodeRunResponse } from './daytona.ts';
 import * as weave from './weave.ts';
+import type { AgentCreationHistory, GenerationAttempt, ExecutionResult as SessionExecutionResult, AgentFiles } from '../history.ts';
 
 // ============================================================================
 // Type Definitions
@@ -75,6 +76,9 @@ export interface OrchestratorOptions {
   language?: string;
   model?: string;
   logCallback?: ((log: LogEntry) => void) | null;
+  agentName?: string;
+  systemPrompt?: string;
+  judgingCriteria?: string;
 }
 
 /**
@@ -91,6 +95,7 @@ export interface OrchestratorResult {
     execution: number;
     total: number;
   };
+  history: AgentCreationHistory;
 }
 
 // ============================================================================
@@ -188,9 +193,10 @@ function analyzeExecutionOutput(response: CodeRunResponse): ExecutionResult {
 // ============================================================================
 
 /**
- * Generate code from user prompt (internal implementation)
+ * FBI Agent: Code Generator 🤖
+ * Interrogates the AI to generate code from user prompts
  */
-async function generateCodeStepImpl(
+async function agentGenerateCode(
   prompt: string,
   maxRetries: number,
   model: string
@@ -218,14 +224,15 @@ async function generateCodeStepImpl(
 }
 
 /**
- * Generate code step with Weave tracing
+ * Traced: FBI Agent Code Generator
  */
-const generateCodeStep = weave.op(generateCodeStepImpl);
+const generateCodeWithAgent = weave.op(agentGenerateCode);
 
 /**
- * Execute code in sandbox (internal implementation)
+ * FBI Agent: Code Executor 🔬
+ * Runs suspect code in a secure sandbox for forensic analysis
  */
-async function executeCodeStepImpl(
+async function agentExecuteCode(
   code: string,
   language: string
 ): Promise<ExecutionResult> {
@@ -247,14 +254,25 @@ async function executeCodeStepImpl(
 }
 
 /**
- * Execute code step with Weave tracing
+ * Traced: FBI Agent Code Executor
  */
-const executeCodeStep = weave.op(executeCodeStepImpl);
+const executeCodeInSandbox = weave.op(agentExecuteCode);
 
 /**
- * Main orchestrator workflow (internal implementation)
+ * Generate a unique version ID for this agent creation session
  */
-async function orchestrateImpl(
+function generateVersionID(): string {
+  const timestamp = Date.now();
+  const random = Math.random().toString(36).substring(2, 8);
+  return `agent-${timestamp}-${random}`;
+}
+
+/**
+ * FBI Field Office: Agent Dispatch 🕵️
+ * The main case handler that coordinates all field agents
+ * (Generates code, executes it, builds the case file)
+ */
+async function dispatchAgents(
   userPrompt: string,
   options: OrchestratorOptions = {}
 ): Promise<OrchestratorResult> {
@@ -262,11 +280,31 @@ async function orchestrateImpl(
     maxRetries = 3,
     language = 'typescript',
     model = "Qwen/Qwen3-Coder-480B-A35B-Instruct",
-    logCallback = null
+    logCallback = null,
+    agentName = 'unnamed-agent',
+    systemPrompt = undefined,
+    judgingCriteria = undefined
   } = options;
   
   const logs: LogEntry[] = [];
   const startTime = Date.now();
+  const versionID = generateVersionID();
+  
+  // Initialize session/run data object (this ONE run creates ONE AgentCreationHistory)
+  const sessionData: AgentCreationHistory = {
+    versionID,
+    agentName,
+    ogprompt: userPrompt,
+    attempts: [],
+    systemPrompt,
+    judgingCriteria,
+    wasExecuted: false,
+    files: {
+      indexFile: `agents/${agentName}/index.ts`,
+      metadataFile: `agents/${agentName}/generation-metadata.json`
+    },
+    finalCode: ''
+  };
   
   const log = (
     message: string, 
@@ -295,21 +333,44 @@ async function orchestrateImpl(
       prompt: userPrompt,
       model,
       language,
-      maxRetries 
+      maxRetries,
+      versionID 
     });
     
     // Step 1: Generate code
     log('Generating code from prompt...', 'info');
     const genStartTime = Date.now();
     
-    const generation = await generateCodeStep(userPrompt, maxRetries, model);
+    const generation = await generateCodeWithAgent(userPrompt, maxRetries, model);
     const genDuration = Date.now() - genStartTime;
+    
+    // Record generation attempt in session data
+    const genAttempt: GenerationAttempt = {
+      attemptNumber: generation.attempts,
+      timestamp: new Date().toISOString(),
+      extractionSuccess: generation.success,
+      rawResponse: generation.rawResponse,
+      extractedCode: generation.code,
+      error: generation.error,
+      prompt: userPrompt
+    };
+    sessionData.attempts?.push(genAttempt);
+    
+    // Log attempt to Weave for tracking
+    log('Generation attempt recorded', 'info', {
+      attemptNumber: genAttempt.attemptNumber,
+      extractionSuccess: genAttempt.extractionSuccess,
+      hasCode: !!genAttempt.extractedCode,
+      versionID: sessionData.versionID
+    });
     
     if (!generation.success) {
       log('Code generation failed', 'error', { 
         error: generation.error,
         attempts: generation.attempts 
       });
+      
+      sessionData.error = generation.error || 'Code generation failed';
       
       return {
         success: false,
@@ -329,7 +390,8 @@ async function orchestrateImpl(
           generation: genDuration,
           execution: 0,
           total: Date.now() - startTime
-        }
+        },
+        history: sessionData
       };
     }
     
@@ -339,12 +401,37 @@ async function orchestrateImpl(
       codeLength: generation.code.length
     });
     
+    // Store the generated code in session data
+    sessionData.finalCode = generation.code;
+    
     // Step 2: Execute code
     log('Executing code in Daytona sandbox...', 'info');
     const execStartTime = Date.now();
     
-    const execution = await executeCodeStep(generation.code, language);
+    const execution = await executeCodeInSandbox(generation.code, language);
     const execDuration = Date.now() - execStartTime;
+    
+    // Mark that execution was attempted
+    sessionData.wasExecuted = true;
+    
+    // Record execution results in the last attempt
+    const execResult: SessionExecutionResult = {
+      success: execution.success,
+      output: execution.output,
+      error: execution.errorMessage
+    };
+    
+    if (sessionData.attempts && sessionData.attempts.length > 0) {
+      sessionData.attempts[sessionData.attempts.length - 1].execution = execResult;
+    }
+    
+    // Log execution result to Weave for tracking
+    log('Execution result recorded', 'info', {
+      executionSuccess: execResult.success,
+      hasOutput: !!execResult.output,
+      errorType: execution.errorType,
+      versionID: sessionData.versionID
+    });
     
     if (execution.hasError) {
       log(`Code execution failed: ${execution.errorType} error`, 'error', {
@@ -352,6 +439,8 @@ async function orchestrateImpl(
         errorMessage: execution.errorMessage,
         output: execution.output.substring(0, 500)
       });
+      
+      sessionData.error = execution.errorMessage || `Execution failed: ${execution.errorType}`;
     } else {
       log('Code executed successfully', 'success', {
         hasOutput: !!execution.output,
@@ -368,9 +457,23 @@ async function orchestrateImpl(
       overallSuccess ? 'success' : 'warning',
       {
         success: overallSuccess,
-        duration: totalDuration
+        duration: totalDuration,
+        versionID: sessionData.versionID,
+        totalAttempts: sessionData.attempts?.length || 0,
+        wasExecuted: sessionData.wasExecuted
       }
     );
+    
+    // Log complete session data to Weave for analysis
+    log('Session data summary', 'info', {
+      versionID: sessionData.versionID,
+      agentName: sessionData.agentName,
+      totalAttempts: sessionData.attempts?.length || 0,
+      finalCodeLength: sessionData.finalCode.length,
+      wasExecuted: sessionData.wasExecuted,
+      hasError: !!sessionData.error,
+      overallSuccess
+    });
     
     return {
       success: overallSuccess,
@@ -382,7 +485,8 @@ async function orchestrateImpl(
         generation: genDuration,
         execution: execDuration,
         total: totalDuration
-      }
+      },
+      history: sessionData
     };
     
   } catch (error) {
@@ -391,23 +495,30 @@ async function orchestrateImpl(
       error: err.message,
       stack: err.stack
     });
+    
+    // Record error in session data
+    sessionData.error = err.message;
+    sessionData.stackTrace = err.stack;
+    
     throw error;
   }
 }
 
 /**
- * Main orchestrator workflow with Weave tracing
+ * FBI Case Handler: Orchestrate Mission 🎯
  * 
- * Orchestrates the complete workflow:
- * 1. Generate code from user prompt
- * 2. Execute code in Daytona sandbox
- * 3. Analyze and return results
+ * Dispatches field agents to complete the mission:
+ * 1. Agent generates code from user prompt
+ * 2. Agent executes code in secure sandbox
+ * 3. Build complete case file (session data)
+ * 
+ * All operations are traced for the case file.
  * 
  * @param userPrompt - The user's prompt describing what they want
  * @param options - Configuration options
- * @returns Complete orchestration result with all steps traced
+ * @returns Complete case file with all evidence traced
  */
-export const orchestrate = weave.op(orchestrateImpl);
+export const orchestrate = weave.op(dispatchAgents);
 
 // ============================================================================
 // Convenience Functions
@@ -458,34 +569,66 @@ export async function testOrchestrator(customPrompts?: string[]): Promise<void> 
   
   console.log(`📋 Testing ${testPrompts.length} prompt(s)\n`);
   
-  for (const prompt of testPrompts) {
+  for (let i = 0; i < testPrompts.length; i++) {
+    const prompt = testPrompts[i];
     console.log('\n' + '='.repeat(60));
-    console.log(`📋 Testing: ${prompt}`);
+    console.log(`📋 Test ${i + 1}/${testPrompts.length}: ${prompt}`);
     console.log('='.repeat(60) + '\n');
     
     try {
       const result = await orchestrate(prompt, {
+        agentName: `test-agent-${i + 1}`,
         logCallback: (log) => {
-          // Additional logging if needed
+          // Additional logging if needed - these are already being logged
         }
       });
       
       console.log('\n📊 RESULT:');
       console.log('---');
       console.log(`Success: ${result.success}`);
+      console.log(`Version ID: ${result.history.versionID}`);
+      console.log(`Agent Name: ${result.history.agentName}`);
       console.log(`Generation attempts: ${result.generation.attempts}`);
       console.log(`Execution status: ${result.execution.success ? 'OK' : 'ERROR'}`);
       if (result.execution.errorType) {
         console.log(`Error type: ${result.execution.errorType}`);
       }
-      console.log(`\nDuration:`);
+      
+      console.log(`\n⏱️  Duration:`);
       console.log(`  - Generation: ${result.duration.generation}ms`);
       console.log(`  - Execution: ${result.duration.execution}ms`);
       console.log(`  - Total: ${result.duration.total}ms`);
-      console.log('\nGenerated Code:');
+      
+      console.log('\n📝 Session Data:');
+      console.log(`  - Total attempts: ${result.history.attempts?.length || 0}`);
+      console.log(`  - Was executed: ${result.history.wasExecuted}`);
+      console.log(`  - Final code length: ${result.history.finalCode.length} chars`);
+      console.log(`  - Has error: ${!!result.history.error}`);
+      
+      if (result.history.attempts && result.history.attempts.length > 0) {
+        console.log('\n🔍 Attempts:');
+        result.history.attempts.forEach((attempt, idx) => {
+          console.log(`  Attempt ${idx + 1}:`);
+          console.log(`    - Success: ${attempt.extractionSuccess}`);
+          console.log(`    - Timestamp: ${attempt.timestamp}`);
+          if (attempt.execution) {
+            console.log(`    - Execution success: ${attempt.execution.success}`);
+            console.log(`    - Output length: ${attempt.execution.output?.length || 0} chars`);
+          }
+        });
+      }
+      
+      console.log('\n💻 Generated Code (preview):');
       console.log(result.generation.code.substring(0, 300) + '...');
-      console.log('\nExecution Output:');
-      console.log(result.execution.output);
+      
+      console.log('\n📤 Execution Output:');
+      console.log(result.execution.output.substring(0, 500));
+      
+      if (result.execution.parsedOutput) {
+        console.log('\n✨ Parsed Output:');
+        console.log(JSON.stringify(result.execution.parsedOutput, null, 2));
+      }
+      
       console.log('---\n');
       
     } catch (error) {

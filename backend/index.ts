@@ -22,11 +22,9 @@ import {
   runDaytonaTest
 } from './daytona.ts';
 
-// Code generation and execution
+// Code generation (execution moved to FBI orchestrator)
 import {
-  generateCode,
-  generateAndExecute,
-  testCodeGen
+  generateCode
 } from './codegen.ts';
 
 // Wandb inference
@@ -41,8 +39,18 @@ import {
 import {
   orchestrate,
   run as orchestratorRun,
-  testOrchestrator
+  testOrchestrator,
+  type OrchestratorOptions,
+  type OrchestratorResult
 } from './fbi.ts';
+
+// Session/Run data model (each run creates one AgentCreationHistory)
+import type {
+  AgentCreationHistory,
+  GenerationAttempt,
+  ExecutionResult as SessionExecutionResult,
+  AgentFiles
+} from '../history.ts';
 
 // Export all backend modules
 export {
@@ -59,8 +67,6 @@ export {
   runDaytonaTest,
   // Code generation
   generateCode,
-  generateAndExecute,
-  testCodeGen,
   // Wandb inference
   chat,
   simpleChat,
@@ -69,7 +75,14 @@ export {
   // FBI orchestrator
   orchestrate,
   orchestratorRun,
-  testOrchestrator
+  testOrchestrator,
+  type OrchestratorOptions,
+  type OrchestratorResult,
+  // Session/Run data model types
+  type AgentCreationHistory,
+  type GenerationAttempt,
+  type SessionExecutionResult,
+  type AgentFiles
 };
 
 // Legacy backend object for backward compatibility
@@ -87,9 +100,7 @@ export const backend = {
     test: runDaytonaTest
   },
   codegen: {
-    generate: generateCode,
-    execute: generateAndExecute,
-    test: testCodeGen
+    generate: generateCode
   },
   wandb: {
     chat,

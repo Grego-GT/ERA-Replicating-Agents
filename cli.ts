@@ -130,6 +130,7 @@ async function createAgentWithAI(name: string, promptText: string): Promise<void
     // Call the FBI orchestrator (generation + execution)
     const result = await orchestratorRun(promptText, {
       maxRetries: 3,
+      agentName: name,
       logCallback: (log) => {
         // Show important log messages
         if (log.level === 'error' || log.level === 'warning') {
@@ -181,22 +182,9 @@ async function createAgentWithAI(name: string, promptText: string): Promise<void
     const agentFilePath = join(agentDir, "index.ts");
     await Deno.writeTextFile(agentFilePath, agentCode);
     
-    // Also save the full orchestration metadata
+    // Save the complete history metadata (includes all session data)
     const metadataPath = join(agentDir, "generation-metadata.json");
-    await Deno.writeTextFile(metadataPath, JSON.stringify({
-      name,
-      prompt: promptText,
-      model: result.generation.model,
-      attempts: result.generation.attempts,
-      generatedAt: new Date().toISOString(),
-      rawResponse: result.generation.rawResponse,
-      execution: {
-        success: result.execution.success,
-        errorType: result.execution.errorType,
-        parsedOutput: result.execution.parsedOutput
-      },
-      duration: result.duration
-    }, null, 2));
+    await Deno.writeTextFile(metadataPath, JSON.stringify(result.history, null, 2));
 
     console.log(colorize(`\n   ✨ AI-generated agent created at: ${colorize(`agents/${name}/index.ts`, "bold")}`, "green"));
     console.log(colorize(`   📋 Metadata saved at: ${colorize(`agents/${name}/generation-metadata.json`, "bold")}`, "gray"));
