@@ -57,10 +57,7 @@ console.log('\n📌 TEST 2: Inject utility into simple user code\n');
 // This is what an AI might generate - simple code that USES wandbChat
 const simpleUserCode = `
 const question = 'What is 1+1?';
-const answer = await wandbChat(question, {
-  temperature: 0.3,
-  maxTokens: 50
-});
+const answer = await wandbChat(question);
 
 console.log(JSON.stringify({
   success: true,
@@ -99,9 +96,7 @@ console.log('\n📌 TEST 3: Multiple LLM calls in sequence\n');
 
 const multiCallCode = `
 const joke = await wandbChat('Tell me a short joke');
-const rating = await wandbChat(\`Rate this joke from 1-10: \${joke}\`, {
-  temperature: 0.5
-});
+const rating = await wandbChat(\`Rate this joke from 1-10: \${joke}\`);
 
 console.log(JSON.stringify({
   success: true,
@@ -166,9 +161,7 @@ console.log('\n📌 TEST 5: System prompt support\n');
 
 const systemPromptCode = `
 const answer = await wandbChat('What is TypeScript?', {
-  systemPrompt: 'You are a concise technical writer. Answer in one sentence.',
-  temperature: 0.3,
-  maxTokens: 100
+  systemPrompt: 'You are a concise technical writer. Answer in one sentence.'
 });
 
 console.log(JSON.stringify({

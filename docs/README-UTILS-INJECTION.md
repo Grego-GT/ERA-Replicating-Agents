@@ -42,10 +42,7 @@ This system allows AI-generated agents to use utility libraries (wandb, weave) i
 **Usage in Generated Code**:
 ```javascript
 // AI generates this simple code:
-const joke = await wandbChat('Tell me a joke', {
-  temperature: 0.7,
-  maxTokens: 100
-});
+const joke = await wandbChat('Tell me a joke');
 console.log(joke);
 
 // We inject the wandbChat utility automatically!

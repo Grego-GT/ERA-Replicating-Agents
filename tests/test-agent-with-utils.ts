@@ -36,18 +36,12 @@ await initWeave('joke-agent');
 
 // Create traced operations with clear namespacing
 const fetchJoke = createTracedOp('joke-agent:fetch_joke', async (topic) => {
-  const joke = await wandbChat(\`Tell me a short joke about \${topic}\`, {
-    temperature: 0.8,
-    maxTokens: 100
-  });
+  const joke = await wandbChat(\`Tell me a short joke about \${topic}\`);
   return joke;
 });
 
 const rateJoke = createTracedOp('joke-agent:rate_joke', async (joke) => {
-  const rating = await wandbChat(\`Rate this joke from 1-10 (just give the number): "\${joke}"\`, {
-    temperature: 0.3,
-    maxTokens: 10
-  });
+  const rating = await wandbChat(\`Rate this joke from 1-10 (just give the number): "\${joke}"\`);
   return rating.trim();
 });
 
@@ -93,8 +87,6 @@ const finalCode = `
       messages: [{ role: 'user', content: userMessage }],
     };
     
-    if (options.temperature !== undefined) body.temperature = options.temperature;
-    if (options.maxTokens !== undefined) body.max_tokens = options.maxTokens;
     if (options.systemPrompt !== undefined) {
       body.messages = [
         { role: 'system', content: options.systemPrompt },
@@ -237,8 +229,7 @@ const simpleCode = `
       },
       body: JSON.stringify({
         model: 'Qwen/Qwen3-Coder-480B-A35B-Instruct',
-        messages: [{ role: 'user', content: question }],
-        max_tokens: 50
+        messages: [{ role: 'user', content: question }]
       })
     });
     

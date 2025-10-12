@@ -17,10 +17,7 @@
 
     const generateJoke = createTracedOp('joke-generator:generate_joke', async (topic: string): Promise<string> => {
       const prompt = `Tell me a funny joke about ${topic}. Keep it appropriate and clever.`;
-      return await wandbChat(prompt, {
-        temperature: 0.7,
-        maxTokens: 150
-      });
+      return await wandbChat(prompt);
     });
 
     const formatResponse = createTracedOp('joke-generator:format_response', (joke: string) => {

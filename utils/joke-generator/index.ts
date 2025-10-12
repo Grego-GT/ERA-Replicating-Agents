@@ -29,8 +29,6 @@ async function wandbChat(userMessage: string, options: any = {}): Promise<string
   };
   
   // Add optional parameters
-  if (options.temperature !== undefined) body.temperature = options.temperature;
-  if (options.maxTokens !== undefined) body.max_tokens = options.maxTokens;
   if (options.systemPrompt !== undefined) {
     body.messages = [
       { role: 'system', content: options.systemPrompt },
@@ -159,10 +157,7 @@ function createTracedOp(operationName: string, fn: any): any {
     try {
       // Generate joke using wandbChat
       const generateJokeOp = createTracedOp('joke-generator:generate_joke', async (validatedTopic: string) => {
-        const joke = await wandbChat(`Tell me a joke about ${validatedTopic}`, {
-          temperature: 0.7,
-          maxTokens: 150
-        });
+        const joke = await wandbChat(`Tell me a joke about ${validatedTopic}`);
         return joke;
       });
 

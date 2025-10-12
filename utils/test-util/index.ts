@@ -29,8 +29,6 @@ async function wandbChat(userMessage: string, options: any = {}): Promise<string
   };
   
   // Add optional parameters
-  if (options.temperature !== undefined) body.temperature = options.temperature;
-  if (options.maxTokens !== undefined) body.max_tokens = options.maxTokens;
   if (options.systemPrompt !== undefined) {
     body.messages = [
       { role: 'system', content: options.systemPrompt },

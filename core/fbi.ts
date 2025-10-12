@@ -256,11 +256,11 @@ const improvePromptWithDirector = directorImprovePrompt;
  */
 async function agentGenerateCode(
   prompt: string,
-  maxRetries: number,
-  model: string
+  maxRetries: number
 ): Promise<GenerationResult> {
   try {
-    const result = await generateCode(prompt, maxRetries, model);
+    // Don't pass model - let generateCode use its own defaults (AI_MODEL_CODEGEN → AI_MODEL → default)
+    const result = await generateCode(prompt, maxRetries);
     return {
       success: result.success,
       code: result.code,
@@ -275,7 +275,7 @@ async function agentGenerateCode(
       code: '',
       rawResponse: '',
       attempts: maxRetries,
-      model,
+      model: Deno.env.get('AI_MODEL_CODEGEN') || Deno.env.get('AI_MODEL') || "Qwen/Qwen3-Coder-480B-A35B-Instruct",
       error: err.message
     };
   }
@@ -466,7 +466,7 @@ async function dispatchAgents(
       log('Generating code from prompt...', 'info');
       const genStartTime = Date.now();
       
-      const generation = await generateCodeWithAgent(finalPrompt, maxRetries, model);
+      const generation = await generateCodeWithAgent(finalPrompt, maxRetries);
       const genDuration = Date.now() - genStartTime;
       totalGenDuration += genDuration;
       
@@ -549,8 +549,8 @@ async function dispatchAgents(
         detectedUtilities.push('wandb');
       }
       
-      // Check for weave usage (or always include for tracing)
-      if (generation.code.includes('initWeave') || generation.code.includes('createTracedOp') || detectedUtilities.length > 0) {
+      // Check for weave usage (only if explicitly used in code)
+      if (generation.code.includes('initWeave') || generation.code.includes('createTracedOp') || generation.code.includes('traceFunction')) {
         detectedUtilities.push('weave');
       }
       
@@ -571,10 +571,8 @@ async function dispatchAgents(
         detectedUtilities.push('mastra');
       }
       
-      // Always include weave if we have any utilities (for tracing)
-      if (detectedUtilities.length > 0 && !detectedUtilities.includes('weave')) {
-        detectedUtilities.push('weave');
-      }
+      // Only include weave if explicitly requested by the AI model
+      // (Don't force it for simple tasks like FizzBuzz)
       
       // Inject detected utilities into generated code before execution
       if (detectedUtilities.length > 0) {

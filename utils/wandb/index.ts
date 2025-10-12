@@ -37,6 +37,8 @@ export interface ChatOptions {
   model?: string;
   messages?: ChatMessage[];
   systemPrompt?: string | null;
+  /** Optional component name for component-specific URL lookup (e.g., 'director', 'codegen', 'fbi', 'sluggen') */
+  component?: string;
 }
 
 /**
@@ -93,16 +95,42 @@ export interface ChatWithHistoryResponse {
 
 /**
  * Get Wandb API configuration from environment
+ * Supports component-specific inference URLs and API keys for granular control
  * 
+ * @param component - Optional component name (e.g., 'director', 'codegen', 'fbi', 'sluggen')
  * @returns Config object with apiKey, project, and inferenceUrl
  */
-function getWandbConfig(): WandbConfig {
-  const apiKey = Deno.env.get('INFERENCE_API_KEY') || Deno.env.get('WANDB_API_KEY');
+function getWandbConfig(component?: string): WandbConfig {
   const project = Deno.env.get('WANDB_PROJECT');
-  const inferenceUrl = Deno.env.get('INFERENCE_URL') || 'https://api.inference.wandb.ai/v1/chat/completions';
+  
+  // Component-specific API key lookup with fallback chain:
+  // 1. INFERENCE_API_KEY_<COMPONENT> (e.g., INFERENCE_API_KEY_DIRECTOR)
+  // 2. INFERENCE_API_KEY (global override)
+  // 3. WANDB_API_KEY (default)
+  let apiKey: string | undefined;
+  
+  if (component) {
+    const componentKeyKey = `INFERENCE_API_KEY_${component.toUpperCase()}`;
+    apiKey = Deno.env.get(componentKeyKey) || Deno.env.get('INFERENCE_API_KEY') || Deno.env.get('WANDB_API_KEY');
+  } else {
+    apiKey = Deno.env.get('INFERENCE_API_KEY') || Deno.env.get('WANDB_API_KEY');
+  }
   
   if (!apiKey) {
     throw new Error('INFERENCE_API_KEY or WANDB_API_KEY not found in environment');
+  }
+  
+  // Component-specific URL lookup with fallback chain:
+  // 1. INFERENCE_URL_<COMPONENT> (e.g., INFERENCE_URL_DIRECTOR)
+  // 2. INFERENCE_URL (global override)
+  // 3. Default Wandb URL
+  let inferenceUrl = 'https://api.inference.wandb.ai/v1/chat/completions';
+  
+  if (component) {
+    const componentUrlKey = `INFERENCE_URL_${component.toUpperCase()}`;
+    inferenceUrl = Deno.env.get(componentUrlKey) || Deno.env.get('INFERENCE_URL') || inferenceUrl;
+  } else {
+    inferenceUrl = Deno.env.get('INFERENCE_URL') || inferenceUrl;
   }
   
   return { apiKey, project, inferenceUrl };
@@ -119,17 +147,18 @@ function getWandbConfig(): WandbConfig {
 async function llmConversation({
   model = Deno.env.get('AI_MODEL') || "Qwen/Qwen3-Coder-480B-A35B-Instruct",
   messages = [],
-  systemPrompt = null
+  systemPrompt = null,
+  component
 }: ChatOptions): Promise<ChatCompletionResponse> {
   const startTime = Date.now();
   
   // Acquire semaphore token
   await sema.acquire();
   
-  console.log(`🤖 Wandb API call starting (model: ${model})...`);
+  console.log(`🤖 Wandb API call starting (model: ${model}${component ? `, component: ${component}` : ''})...`);
   
   try {
-    const { apiKey, project, inferenceUrl } = getWandbConfig();
+    const { apiKey, project, inferenceUrl } = getWandbConfig(component);
     
     // Build messages array
     let fullMessages: ChatMessage[] = [...messages];

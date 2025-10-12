@@ -311,63 +311,57 @@ PARALLEL_API_KEY=your_parallel_api_key
 
 ### AI Model Configuration
 
-ERA uses environment variables to configure AI models, making it easy to switch models without changing code:
+ERA supports per-component model and provider configuration. You can mix different providers (Wandb, OpenAI, Groq) for optimal speed/cost/quality.
 
-#### Default Model (`AI_MODEL`)
+> **⚠️ Important:** `WANDB_API_KEY` is always required for Weave tracing, even if you use other providers for inference.
 
-The `AI_MODEL` environment variable sets the default model for all AI operations:
+**Components:** `director`, `codegen`, `fbi`, `sluggen`, `promoter`
+
+**Configuration Priority:**
+- **Models**: `AI_MODEL_<COMPONENT>` → `AI_MODEL` → `Qwen/Qwen3-Coder-480B-A35B-Instruct`
+- **URLs**: `INFERENCE_URL_<COMPONENT>` → `INFERENCE_URL` → `https://api.inference.wandb.ai/v1/chat/completions`
+- **Keys**: `INFERENCE_API_KEY_<COMPONENT>` → `INFERENCE_API_KEY` → `WANDB_API_KEY`
+
+#### Example 1: Default (Wandb with Qwen3)
 
 ```env
+WANDB_API_KEY=your_wandb_api_key_here
 AI_MODEL=Qwen/Qwen3-Coder-480B-A35B-Instruct
 ```
 
-This model is used across:
-
-- **FBI Director** - Prompt improvement and verdict decisions
-- **Code Generation** - Generating agent code from prompts
-- **FBI Orchestrator** - Overall orchestration
-- **Utility Promotion** - Converting agents to utilities
-
-#### Component-Specific Overrides
-
-You can override the model for specific components:
+#### Example 2: Use OpenAI for Everything
 
 ```env
-# Override Director model (for prompt refinement)
-AI_MODEL_DIRECTOR=Qwen/Qwen3-Coder-480B-A35B-Instruct
-
-# Override Code Generation model
-AI_MODEL_CODEGEN=Qwen/Qwen3-Coder-480B-A35B-Instruct
-
-# Override FBI Orchestrator model
-AI_MODEL_FBI=Qwen/Qwen3-Coder-480B-A35B-Instruct
+WANDB_API_KEY=your_wandb_key_here  # Still needed for Weave tracing!
+INFERENCE_URL=https://api.openai.com/v1/chat/completions
+INFERENCE_API_KEY=sk-your_openai_key_here
+AI_MODEL=gpt-4o
 ```
 
-**Priority order**: Component-specific env var → `AI_MODEL` → Hardcoded default
-
-#### Examples
-
-**Use a different model for all operations:**
+#### Example 3: Mix & Match (Groq for Speed + OpenAI for Quality)
 
 ```env
-AI_MODEL=meta-llama/Llama-3.3-70B-Instruct
+# Fast operations (Director, FBI, Slug) → Groq
+INFERENCE_URL_DIRECTOR=https://api.groq.com/openai/v1/chat/completions
+INFERENCE_API_KEY_DIRECTOR=gsk_your_groq_key_here
+AI_MODEL_DIRECTOR=llama-3.3-70b-versatile
+
+INFERENCE_URL_FBI=https://api.groq.com/openai/v1/chat/completions
+INFERENCE_API_KEY_FBI=gsk_your_groq_key_here
+AI_MODEL_FBI=llama-3.3-70b-versatile
+
+INFERENCE_URL_SLUGGEN=https://api.groq.com/openai/v1/chat/completions
+INFERENCE_API_KEY_SLUGGEN=gsk_your_groq_key_here
+AI_MODEL_SLUGGEN=llama-3.1-8b-instant
+
+# Quality code generation → OpenAI
+INFERENCE_URL_CODEGEN=https://api.openai.com/v1/chat/completions
+INFERENCE_API_KEY_CODEGEN=sk-your_openai_key_here
+AI_MODEL_CODEGEN=gpt-4o
+
+# Fallback for promoter → Wandb
+WANDB_API_KEY=your_wandb_key_here
 ```
-
-**Use GPT-4 for Director decisions, but Qwen for code generation:**
-
-```env
-AI_MODEL_DIRECTOR=gpt-4-turbo-preview
-AI_MODEL_CODEGEN=Qwen/Qwen3-Coder-480B-A35B-Instruct
-```
-
-**Use the default Qwen model everywhere:**
-
-```env
-# Just set AI_MODEL or leave it unset to use the built-in default
-AI_MODEL=Qwen/Qwen3-Coder-480B-A35B-Instruct
-```
-
-> **Note**: The naming AI (for suggesting agent names) currently uses a hardcoded model and doesn't read from environment variables.
 
 ### Deno Configuration
 

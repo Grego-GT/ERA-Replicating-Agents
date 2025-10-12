@@ -31,10 +31,7 @@
     try {
       // Generate joke using wandbChat
       const generateJokeOp = createTracedOp('joke-generator:generate_joke', async (validatedTopic: string) => {
-        const joke = await wandbChat(`Tell me a joke about ${validatedTopic}`, {
-          temperature: 0.7,
-          maxTokens: 150
-        });
+        const joke = await wandbChat(`Tell me a joke about ${validatedTopic}`);
         return joke;
       });
 

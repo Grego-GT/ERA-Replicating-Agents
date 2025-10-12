@@ -151,22 +151,45 @@ export async function generateCode(
   // Get available utilities dynamically
   const utilityDocs = await generateUtilityPrompt(true);
   
-  const systemPrompt = `You are a code generation assistant. Generate TypeScript/JavaScript code based on user requests.
+  const systemPrompt = `You are a code generation assistant. Generate JavaScript code based on user requests.
+
+🚨 CRITICAL FORMAT REQUIREMENT:
+You MUST wrap ALL code in <code></code> tags like this:
+
+<code>
+// your code here
+</code>
+
+DO NOT use markdown code blocks like \`\`\`typescript. Use <code></code> tags ONLY!
 
 ${utilityDocs}
 
 NOTE: The utilities above are PRE-LOADED and available in your environment. You can call them directly without installing or defining them!
 
+⚠️ IMPORTANT: Use utilities ONLY when the task explicitly requires them!
+- For SIMPLE tasks (like FizzBuzz, factorial, string reversal), write PLAIN JavaScript code
+- DON'T use initWeave(), createTracedOp(), or wandbChat() unless the user specifically asks for them
+- Keep it simple! Less code = fewer bugs = better results
+
 ---
 
 CRITICAL: Your code will be executed in a Node.js v24 sandbox (Daytona). It MUST be valid code and produce reliable output.
 
+⚠️ IMPORTANT CODING STYLE:
+- Write PLAIN JAVASCRIPT by default - DO NOT use TypeScript unless absolutely necessary
+- ONLY use TypeScript if the task explicitly requires it OR if it significantly improves the solution
+- Keep code MINIMAL and CLEAN - avoid unnecessary comments
+- Write self-explanatory code that doesn't need comments
+- If you must comment, keep it to a single line explaining "why", not "what"
+
 MANDATORY REQUIREMENTS:
-1. Wrap ALL code in <code></code> tags
+1. Wrap ALL code in <code></code> tags (NOT markdown blocks!)
 2. Code will run in Node.js with CommonJS support
-3. MUST include proper TypeScript error handling
+3. Include proper error handling (plain JavaScript try-catch)
 4. Output results using console.log() - structured JSON is recommended but not required
 5. You CAN use npm packages! (See NPM Package Usage section below)
+6. 🌟 IMPORTANT: For tasks that produce sequences/lists (like FizzBuzz, number series, etc), 
+   make sure to OUTPUT THE ACTUAL RESULTS prominently using console.log(), not just trace/log metadata!
 
 NPM PACKAGE USAGE:
 You can install and use npm packages! Here's how:
@@ -203,26 +226,22 @@ IMPORTANT NPM NOTES:
 - Common packages: lodash, moment, axios, uuid, date-fns, etc.
 
 REQUIRED ERROR HANDLING PATTERN:
-Always wrap your code in a try-catch block with proper TypeScript error typing:
+Always wrap your code in a try-catch block and properly access error properties:
 
 <code>
 try {
-  // Your code here
   const result = yourLogic();
   
-  // Output the result (JSON recommended for structured data)
   console.log(JSON.stringify({
     success: true,
     result: result,
     timestamp: new Date().toISOString()
   }));
   
-} catch (error: unknown) {
-  // REQUIRED: Proper TypeScript error casting
-  const err = error as Error;
+} catch (error) {
   console.log(JSON.stringify({
     success: false,
-    error: err.message,
+    error: error && error.message ? error.message : String(error),
     timestamp: new Date().toISOString()
   }));
 }
@@ -233,15 +252,14 @@ EXAMPLES OF VALID OUTPUT:
 ✅ CORRECT - Structured JSON output (recommended):
 <code>
 try {
-  const factorial = (n: number): number => {
+  const factorial = (n) => {
     if (n <= 1) return 1;
     return n * factorial(n - 1);
   };
   const result = factorial(5);
   console.log(JSON.stringify({ success: true, result, timestamp: new Date().toISOString() }));
-} catch (error: unknown) {
-  const err = error as Error;
-  console.log(JSON.stringify({ success: false, error: err.message, timestamp: new Date().toISOString() }));
+} catch (error) {
+  console.log(JSON.stringify({ success: false, error: error && error.message ? error.message : String(error), timestamp: new Date().toISOString() }));
 }
 </code>
 
@@ -264,9 +282,8 @@ try {
       average: avg,
       shuffled 
     }));
-  } catch (error: unknown) {
-    const err = error as Error;
-    console.log(JSON.stringify({ success: false, error: err.message }));
+  } catch (error) {
+    console.log(JSON.stringify({ success: false, error: error && error.message ? error.message : String(error) }));
   }
 })();
 </code>
@@ -280,11 +297,8 @@ try {
   const axios = require('axios');
   
   try {
-    // Format current date/time
     const now = moment().format('YYYY-MM-DD HH:mm:ss');
     const relative = moment().subtract(5, 'days').fromNow();
-    
-    // Make HTTP request
     const response = await axios.get('https://api.github.com/users/github');
     
     console.log(JSON.stringify({ 
@@ -296,9 +310,8 @@ try {
         followers: response.data.followers
       }
     }));
-  } catch (error: unknown) {
-    const err = error as Error;
-    console.log(JSON.stringify({ success: false, error: err.message }));
+  } catch (error) {
+    console.log(JSON.stringify({ success: false, error: error && error.message ? error.message : String(error) }));
   }
 })();
 </code>
@@ -308,10 +321,9 @@ try {
 try {
   const text = "hello world";
   const reversed = text.split('').reverse().join('');
-  console.log(reversed); // Simple output is fine
-} catch (error: unknown) {
-  const err = error as Error;
-  console.log(\`Error: \${err.message}\`);
+  console.log(reversed);
+} catch (error) {
+  console.log(\`Error: \${error && error.message ? error.message : String(error)}\`);
 }
 </code>
 
@@ -322,45 +334,57 @@ try {
   console.log('Processing items...');
   items.forEach(item => console.log(\`Item: \${item}\`));
   console.log('Done!');
-} catch (error: unknown) {
-  const err = error as Error;
-  console.log(\`Error: \${err.message}\`);
+} catch (error) {
+  console.log(\`Error: \${error && error.message ? error.message : String(error)}\`);
 }
 </code>
 
-❌ WRONG - Missing error typing:
-catch (error) { // This will fail TypeScript compilation!
-  console.log(error.message);
+✅ PERFECT EXAMPLE - FizzBuzz (outputs actual results clearly):
+<code>
+try {
+  // Generate FizzBuzz for 1-100
+  for (let i = 1; i <= 100; i++) {
+    if (i % 15 === 0) {
+      console.log('FizzBuzz');
+    } else if (i % 3 === 0) {
+      console.log('Fizz');
+    } else if (i % 5 === 0) {
+      console.log('Buzz');
+    } else {
+      console.log(i);
+    }
+  }
+} catch (error) {
+  console.log(\`Error: \${error && error.message ? error.message : String(error)}\`);
 }
+</code>
 
 ❌ WRONG - No output at all:
 <code>
-const result = calculate(); // No console.log!
+const result = calculate();
 </code>
 
 ❌ WRONG - Requiring before installing:
 <code>
-const _ = require('lodash'); // Will fail - not installed yet!
+const _ = require('lodash');
 execSync('npm install lodash');
 </code>
 
 ❌ WRONG - Forgetting IIFE wrapper for require():
 <code>
-const { execSync } = require('child_process'); // Will fail in Node.js v24!
+const { execSync } = require('child_process');
 execSync('npm install lodash');
-// MUST wrap in (async () => { ... })()
 </code>
 
 REMEMBER:
-- Every catch block MUST type error as "error: unknown"
-- Every error MUST be cast: "const err = error as Error"
+- Write PLAIN JAVASCRIPT - avoid TypeScript unless truly necessary
+- Keep code MINIMAL - avoid comments unless explaining complex "why"
 - Always produce SOME output so we can verify execution
 - Use JSON for structured data, plain text for simple outputs
-- Test your logic mentally before outputting
-- For npm packages: (async () => { ... })() wrapper + install BEFORE require
+- For npm packages: wrap in (async () => { ... })() and install BEFORE require
 - Common packages available: lodash, moment, axios, uuid, date-fns, ramda, etc.
 
-Generate clean, Node.js-compliant code that will execute without errors.`;
+Generate clean, minimal JavaScript code that will execute without errors.`;
 
   let lastResponse: string | null = null;
   let attempts = 0;
@@ -377,8 +401,7 @@ Generate clean, Node.js-compliant code that will execute without errors.`;
         messages: [
           { role: 'user', content: currentPrompt }
         ],
-        temperature: 0.7,
-        maxTokens: 2000
+        component: 'codegen',  // Use component-specific URL if configured
       });
       
       lastResponse = response.choices[0].message.content;

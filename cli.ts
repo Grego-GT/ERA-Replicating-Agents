@@ -200,9 +200,8 @@ Return ONLY the slug, nothing else. Examples:
 Slug:`;
 
     const slug = await simpleChat(slugPrompt, {
-      model: "meta-llama/Llama-3.1-8B-Instruct",
-      temperature: 0.3,
-      maxTokens: 50,
+      model: Deno.env.get("AI_MODEL_SLUGGEN") || "meta-llama/Llama-3.1-8B-Instruct",
+      component: "sluggen",  // Use component-specific URL if configured
     });
 
     // Clean up the response - remove quotes, extra spaces, ensure it's a valid slug
@@ -376,6 +375,32 @@ Please generate the complete, improved agent code.
     });
 
     if (!result.success) {
+      // Show clear failure message
+      console.log(colorize("\n" + "=".repeat(60), "red"));
+      console.log(colorize("❌ AGENT CREATION FAILED", "red"));
+      console.log(colorize("=".repeat(60), "red"));
+      
+      if (result.execution.hasError) {
+        console.log(colorize(`\n💥 Error Type: ${result.execution.errorType}`, "red"));
+        if (result.execution.errorMessage) {
+          console.log(colorize(`📝 Details: ${result.execution.errorMessage.substring(0, 200)}`, "yellow"));
+        }
+      } else if (result.generation && !result.generation.success) {
+        console.log(colorize("\n💥 Code generation failed", "red"));
+        if (result.generation.error) {
+          console.log(colorize(`📝 Details: ${result.generation.error}`, "yellow"));
+        }
+      }
+      
+      console.log(colorize(`\n📊 Attempts: ${result.history.attempts?.length || 0} iterations`, "gray"));
+      console.log(colorize(`⏱️  Duration: ${result.duration.total}ms`, "gray"));
+      
+      if (result.history.error) {
+        console.log(colorize(`\n🔍 Last Error: ${result.history.error}`, "yellow"));
+      }
+      
+      console.log(colorize("\n" + "=".repeat(60) + "\n", "red"));
+      
       throw new Error(
         result.execution.hasError ? `Execution failed: ${result.execution.errorType}` : "Code generation failed",
       );
@@ -454,6 +479,11 @@ Please generate the complete, improved agent code.
         /\[Weave\] Failed to initialize:[\s\S]*?(?=\n\n|\n[A-Z]|$)/g,
         /wandb API key not found\.[\s\S]*?(?=\n\n|\n[A-Z]|$)/g,
         /npm.*added.*packages.*in.*s/g,
+        /WARNING: Weave is not initialized[\s\S]*?safely ignore this warning\./g,
+        /\[Weave\] Starting: [^\n]+\n/g,  // Remove all "Starting:" logs
+        /\[Weave\] Completed: [^\n]+\n/g, // Remove all "Completed:" logs
+        /\[Weave\] Failed: [^\n]+\n/g,    // Remove all "Failed:" logs
+        /\[Weave\] Initialized project: [^\n]+\n/g, // Remove initialization logs
       ];
       
       for (const pattern of noisyPatterns) {
@@ -489,11 +519,11 @@ Please generate the complete, improved agent code.
         "yellow",
       ),
     );
-    console.log(colorize("    Falling back to simple template...\n", "gray"));
-
-    // Fallback to simple generation
-    await createAgentSimple(name, promptText);
-    return null;
+    console.log(colorize("💡 Tip: Some models (like Groq) may struggle with complex prompts.", "yellow"));
+    console.log(colorize("    Try using a different model or simplifying your prompt.\n", "yellow"));
+    
+    // Don't create a fallback - let the user see the failure and fix it
+    throw error;
   }
 }
 

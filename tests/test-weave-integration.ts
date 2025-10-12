@@ -43,7 +43,6 @@ try {
   const response = await chat({
     systemPrompt: 'You are a test assistant. Respond concisely.',
     messages: [{ role: 'user', content: 'What is 2+2?' }],
-    temperature: 0.1,
   });
   console.log('Response:', response.choices[0].message.content.substring(0, 50));
   console.log('✅ Chat with options traced successfully\n');

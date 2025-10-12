@@ -231,8 +231,17 @@ If previous execution failed, focus on:
 - Mention relevant patterns or best practices
 - If refining, explicitly address previous errors
 
-## Tracing and Observability:
-When the user asks for "tracing", "observability", or "weave":
+## When to Use Utilities:
+- Use utilities (wandbChat, initWeave, etc.) ONLY if the user's task explicitly requires them
+- For SIMPLE algorithmic tasks (FizzBuzz, factorial, sorting, string manipulation):
+  → Write plain JavaScript/TypeScript - NO utilities needed!
+- For LLM/AI tasks (joke generation, text analysis, chatbots):
+  → Use wandbChat or simpleChat
+- For observability/tracing (ONLY if user asks):
+  → Use initWeave and createTracedOp with format "{agent-name}:{operation-name}"
+  
+## Tracing and Observability (Only When Requested):
+When the user explicitly asks for "tracing", "observability", or "weave":
 - Automatically use the agent name as the namespace prefix
 - Format: "{agent-name}:{operation-name}"
 - Example: For agent "jokemeister", use operations like:
@@ -302,7 +311,10 @@ async function improvePrompt(
     
     // Add utility context
     userMessage += `\n${utilityDocs}\n\n`;
-    userMessage += `IMPORTANT: The above utilities are PRE-LOADED. Tell the code generator to USE them, not reimplement them!\n`;
+    userMessage += `IMPORTANT: The above utilities are PRE-LOADED and available IF NEEDED.
+- ONLY recommend using them if the user's task explicitly requires them
+- For SIMPLE tasks (FizzBuzz, factorial, string operations), recommend plain JavaScript - NO utilities needed!
+- Don't add wandbChat, initWeave, or tracing unless the user specifically asks for LLM calls or observability\n`;
     
     if (systemPrompt) {
       userMessage += `\nSystem Prompt Context:\n${systemPrompt}\n`;
@@ -353,7 +365,8 @@ async function improvePrompt(
     const response = await chat({
       model,
       messages,
-      systemPrompt: DIRECTOR_SYSTEM_PROMPT
+      systemPrompt: DIRECTOR_SYSTEM_PROMPT,
+      component: 'director'  // Use component-specific URL if configured
     });
 
     const content = response.choices[0].message.content;
@@ -523,7 +536,8 @@ async function makeVerdict(
     const response = await chat({
       model,
       messages,
-      systemPrompt: DIRECTOR_VERDICT_SYSTEM_PROMPT
+      systemPrompt: DIRECTOR_VERDICT_SYSTEM_PROMPT,
+      component: 'director'  // Use component-specific URL if configured
     });
 
     const content = response.choices[0].message.content;
@@ -625,7 +639,8 @@ async function generateDescription(
     const response = await chat({
       model: Deno.env.get('AI_MODEL_DIRECTOR') || Deno.env.get('AI_MODEL') || "Qwen/Qwen3-Coder-480B-A35B-Instruct",
       messages,
-      systemPrompt: DIRECTOR_DESCRIPTION_SYSTEM_PROMPT
+      systemPrompt: DIRECTOR_DESCRIPTION_SYSTEM_PROMPT,
+      component: 'director'  // Use component-specific URL if configured
     });
 
     const content = response.choices[0].message.content;

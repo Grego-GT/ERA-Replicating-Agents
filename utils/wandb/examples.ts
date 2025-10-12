@@ -33,8 +33,6 @@ async function wandbChat(userMessage: string, options: any = {}): Promise<string
   };
   
   // Add optional parameters
-  if (options.temperature !== undefined) body.temperature = options.temperature;
-  if (options.maxTokens !== undefined) body.max_tokens = options.maxTokens;
   if (options.systemPrompt !== undefined) {
     body.messages = [
       { role: 'system', content: options.systemPrompt },
@@ -81,8 +79,6 @@ A pre-loaded utility function for making LLM inference calls via Wandb:
 \`\`\`javascript
 async function wandbChat(userMessage: string, options?: {
   model?: string,           // default: 'Qwen/Qwen3-Coder-480B-A35B-Instruct'
-  temperature?: number,     // default: model's default
-  maxTokens?: number,       // default: model's default
   systemPrompt?: string     // optional system prompt
 }): Promise<string>
 \`\`\`
@@ -93,17 +89,15 @@ async function wandbChat(userMessage: string, options?: {
 const response = await wandbChat('What is 2+2?');
 console.log(response);
 
-// With options
+// With model override
 const joke = await wandbChat('Tell me a joke', {
-  temperature: 0.7,
-  maxTokens: 100
+  model: 'Qwen/Qwen3-Coder-480B-A35B-Instruct'
 });
 console.log(joke);
 
 // With system prompt
 const answer = await wandbChat('Explain async/await', {
-  systemPrompt: 'You are a helpful coding tutor.',
-  temperature: 0.5
+  systemPrompt: 'You are a helpful coding tutor.'
 });
 console.log(answer);
 \`\`\`
@@ -130,10 +124,7 @@ export const WANDB_COMPLETE_EXAMPLE = `
   // === Example Usage ===
   try {
     // Simple question
-    const answer = await wandbChat('What is the capital of France?', {
-      temperature: 0.3,
-      maxTokens: 50
-    });
+    const answer = await wandbChat('What is the capital of France?');
     
     console.log(JSON.stringify({
       success: true,
