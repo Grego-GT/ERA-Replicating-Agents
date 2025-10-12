@@ -7,7 +7,7 @@ https://github.com/user-attachments/assets/7a153774-7d1d-4530-bcc7-1c6d798c701e
 
 # ERA 🚀
 
-**Era of Rapid Agents** - Create AI agents with custom prompts using Deno.
+**ERA of Replicating Agents** - Create AI agents with custom prompts using Deno.
 
 A comprehensive Deno-native project featuring:
 
@@ -65,6 +65,9 @@ ERA/
 ```
 
 ---
+
+## Agent Creation Process (How it works)
+<img width="2100" height="1280" alt="Untitled diagram-2025-10-12-181340" src="https://github.com/user-attachments/assets/77f37851-5a86-4386-9577-b395cb3a2265" />
 
 ## 🔧 Usage
 
