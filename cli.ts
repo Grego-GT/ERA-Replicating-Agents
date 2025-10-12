@@ -673,9 +673,13 @@ async function startInteractiveMode(): Promise<void> {
   console.log(colorize("🚀 Welcome to ERA CLI!\n", "cyan"));
   console.log(colorize("Create AI agents with custom prompts\n", "gray"));
 
-  // Initialize Weave for tracing (silently)
+  // Initialize Weave for tracing (completely silent)
   try {
+    // Temporarily suppress console output during weave init
+    const originalLog = console.log;
+    console.log = () => {}; // Suppress output
     await weave.init("era", true); // Silent mode
+    console.log = originalLog; // Restore console.log
   } catch (error) {
     // Silently fail - tracing is optional
   }

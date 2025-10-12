@@ -1,12 +1,19 @@
-
 <img width="256" height="256" alt="era-logo" src="https://github.com/user-attachments/assets/ef2318fa-3f69-42ac-950b-c6765756cd51" />
 
+https://github.com/user-attachments/assets/7a153774-7d1d-4530-bcc7-1c6d798c701e
 
-[![ERA Demo Video](https://img.youtube.com/vi/XFBR9owMNFQ/0.jpg)](https://www.youtube.com/watch?v=XFBR9owMNFQ&feature=youtu.be)
+![](https://github.com/user-attachments/assets/7a153774-7d1d-4530-bcc7-1c6d798c701e)
+
+
+[![Watch the demo](https://img.youtube.com/vi/XFBR9owMNFQ/0.jpg)](https://www.youtube.com/watch?v=XFBR9owMNFQ)
 
 # ERA 🚀
 
 **ERA of Replicating Agents** - Create AI agents with custom prompts using Deno.
+
+# Try us now!
+
+https://agfactory-web.fly.dev/
 
 ## 🌟 Self-Improving Meta-Programming System
 
@@ -58,7 +65,7 @@ cd ERA
 ## 📦 Project Structure
 
 ```
-AgFactory/
+ERA/
 ├── core/                    # 🧠 Core FBI Orchestration System
 │   ├── fbi.ts              # Main orchestrator
 │   ├── director.ts         # AI decision maker & prompt improvement
@@ -92,6 +99,7 @@ AgFactory/
 ---
 
 ## Agent Creation Process (How it works)
+
 <img width="2100" height="1280" alt="Untitled diagram-2025-10-12-181340" src="https://github.com/user-attachments/assets/77f37851-5a86-4386-9577-b395cb3a2265" />
 
 ## 🔧 Usage
@@ -317,6 +325,7 @@ ERA supports per-component model and provider configuration. You can mix differe
 **Components:** `director`, `codegen`, `fbi`, `sluggen`, `promoter`
 
 **Configuration Priority:**
+
 - **Models**: `AI_MODEL_<COMPONENT>` → `AI_MODEL` → `Qwen/Qwen3-Coder-480B-A35B-Instruct`
 - **URLs**: `INFERENCE_URL_<COMPONENT>` → `INFERENCE_URL` → `https://api.inference.wandb.ai/v1/chat/completions`
 - **Keys**: `INFERENCE_API_KEY_<COMPONENT>` → `INFERENCE_API_KEY` → `WANDB_API_KEY`
@@ -419,6 +428,7 @@ ERA uses an intelligent "FBI Director" system that orchestrates code generation:
 ### Workflow
 
 1. **Director Reviews** - Analyzes your prompt and improves it with:
+
    - Specific technical requirements
    - Expected input/output behavior
    - Error handling considerations
@@ -429,6 +439,7 @@ ERA uses an intelligent "FBI Director" system that orchestrates code generation:
 3. **Sandbox Execution** - Tests code in Daytona sandbox environment
 
 4. **Director Verdict** - Analyzes results and decides:
+
    - ✅ Success - code works, stop here
    - 🔄 Retry - has errors, refine and try again
    - 🛑 Stop - no progress, accept current version

@@ -1,10 +1,10 @@
 #!/bin/bash
 
-# AgFactory Fly.io Deployment Script
+# ERA Fly.io Deployment Script
 
 set -e
 
-echo "🏭 AgFactory Deployment to Fly.io"
+echo "🏭 ERA Deployment to Fly.io"
 echo "=================================="
 echo ""
 

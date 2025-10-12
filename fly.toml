@@ -12,6 +12,12 @@ primary_region = 'sjc'
 [env]
   PORT = '8080'
 
+# Persistent storage for agents
+[mounts]
+  source = 'agfactory_data'
+  destination = '/app/agents'
+  initial_size = '1gb'
+
 [http_service]
   internal_port = 8080
   force_https = true
@@ -19,6 +25,12 @@ primary_region = 'sjc'
   auto_start_machines = true
   min_machines_running = 0
   processes = ['app']
+
+  # Keep WebSocket connections alive during long-running operations
+  [http_service.concurrency]
+    type = "connections"
+    hard_limit = 250
+    soft_limit = 200
 
 [[vm]]
   cpu_kind = 'shared'

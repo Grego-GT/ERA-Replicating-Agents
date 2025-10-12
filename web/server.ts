@@ -1,5 +1,5 @@
 /**
- * Deno web server for AgFactory UI
+ * Deno web server for ERA (Emergent Replicating Agents)
  * Serves static files, provides API endpoints, and WebSocket for terminal
  */
 
@@ -8,6 +8,48 @@ import * as esbuild from "esbuild";
 
 const port = parseInt(Deno.env.get("PORT") || "3000");
 const isProduction = Deno.env.get("DENO_ENV") === "production" || Deno.env.get("FLY_APP_NAME");
+
+// Track active WebSocket connections
+const activeConnections = new Set<WebSocket>();
+
+// Broadcast user count to all connected clients
+function broadcastUserCount() {
+  // Clean up closed connections first
+  activeConnections.forEach((socket) => {
+    if (socket.readyState === WebSocket.CLOSED || socket.readyState === WebSocket.CLOSING) {
+      activeConnections.delete(socket);
+      console.log(`🧹 Cleaned up closed connection`);
+    }
+  });
+  
+  const count = activeConnections.size;
+  const message = JSON.stringify({ type: 'user_count', count });
+  
+  console.log(`📢 Broadcasting user count: ${count} to ${activeConnections.size} connections`);
+  
+  let successCount = 0;
+  activeConnections.forEach((socket) => {
+    if (socket.readyState === WebSocket.OPEN) {
+      try {
+        socket.send(message);
+        successCount++;
+      } catch (error) {
+        console.error('Error broadcasting user count:', error);
+        // Mark for cleanup
+        activeConnections.delete(socket);
+      }
+    }
+  });
+  
+  console.log(`✅ Successfully sent to ${successCount}/${activeConnections.size} connections`);
+}
+
+// Periodic heartbeat to keep user count updated and clean up stale connections
+setInterval(() => {
+  broadcastUserCount();
+}, 15000); // Every 15 seconds (Fly.io WebSocket timeout is ~20s)
+
+console.log("⏰ User count heartbeat started (15s interval)");
 
 const MIME_TYPES: Record<string, string> = {
   ".html": "text/html",
@@ -77,7 +119,11 @@ async function serveFile(filePath: string): Promise<Response> {
 
 // Handle WebSocket connections for terminal
 function handleWebSocket(socket: WebSocket) {
-  console.log("🔌 WebSocket connected");
+  console.log("🔌 WebSocket connecting...");
+  
+  // Add to active connections
+  activeConnections.add(socket);
+  console.log(`👥 Active connections: ${activeConnections.size}`);
   
   let currentProcess: Deno.ChildProcess | null = null;
   let processWriter: WritableStreamDefaultWriter<Uint8Array> | null = null;
@@ -86,14 +132,29 @@ function handleWebSocket(socket: WebSocket) {
   let sessionCwd = isProduction 
     ? join(Deno.cwd(), "..")  // /app in production
     : join(Deno.cwd(), "..");  // Parent directory in development
-
+  
+  // Wait for socket to open before sending messages
   socket.onopen = () => {
-    socket.send(JSON.stringify({ type: 'connected' }));
+    console.log("🔌 WebSocket fully open");
+    try {
+      socket.send(JSON.stringify({ type: 'connected' }));
+      // Broadcast user count to all connected clients
+      broadcastUserCount();
+    } catch (error) {
+      console.error('Error sending initial messages:', error);
+    }
   };
 
   socket.onmessage = async (event) => {
     try {
       const data = JSON.parse(event.data);
+      
+      // Handle heartbeat ping
+      if (data.type === 'ping') {
+        socket.send(JSON.stringify({ type: 'pong' }));
+        console.log('💓 Heartbeat ping received, pong sent');
+        return;
+      }
       
       if (data.type === 'start_cli' || data.type === 'run_command') {
         // Close existing process if any
@@ -308,6 +369,11 @@ function handleWebSocket(socket: WebSocket) {
 
   socket.onclose = () => {
     console.log("🔌 WebSocket disconnected");
+    
+    // Remove from active connections
+    activeConnections.delete(socket);
+    broadcastUserCount();
+    
     // Clean up process if still running
     if (currentProcess) {
       try {
@@ -352,7 +418,7 @@ async function handler(req: Request): Promise<Response> {
       const requestedPath = searchParams.get("path") || ".";
       
       try {
-        // Both dev and prod: show parent directory (/app or AgFactory/)
+        // Both dev and prod: show parent directory (/app or project root)
         const basePath = join(Deno.cwd(), "..");
         const targetPath = requestedPath === "." || requestedPath === ".." 
           ? basePath 
@@ -504,7 +570,7 @@ async function handler(req: Request): Promise<Response> {
   return await serveFile(filePath);
 }
 
-console.log(`🏭 AgFactory Web Server starting...`);
+console.log(`🏭 ERA Web Server starting...`);
 console.log(`   Mode: ${isProduction ? "PRODUCTION" : "DEVELOPMENT"}`);
 console.log(`   Port: ${port}`);
 console.log(`   URL:  ${isProduction ? "https://agfactory-web.fly.dev" : `http://localhost:${port}`}`);
