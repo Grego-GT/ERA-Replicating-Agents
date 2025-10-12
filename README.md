@@ -1,6 +1,6 @@
-# AgFactory 🏭
+# ERA 🚀
 
-**Agentic agent factory** - Create AI agents with custom prompts using Deno.
+**Era of Rapid Agents** - Create AI agents with custom prompts using Deno.
 
 A comprehensive Deno-native project featuring:
 
@@ -29,7 +29,7 @@ irm https://deno.land/install.ps1 | iex
 ```bash
 # Clone the repository
 git clone <your-repo-url>
-cd AgFactory
+cd ERA
 
 # No installation needed! Deno downloads dependencies automatically.
 ```
@@ -39,7 +39,7 @@ cd AgFactory
 ## 📦 Project Structure
 
 ```
-AgFactory/
+ERA/
 ├── cli.ts                   # CLI tool for creating agents
 ├── core/
 │   ├── main.js              # Hono web server (main app)

@@ -1,5 +1,5 @@
 {
-  "name": "AgFactory",
+  "name": "ERA",
   "version": "1.0.0",
   "description": "Agentic agent factory - create agents with prompts. Includes Hono server and CLI.",
   "exports": {
@@ -81,4 +81,3 @@
     "entrypoint": "core/main.ts"
   }
 }
-
