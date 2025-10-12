@@ -33,17 +33,22 @@
         width: 100%;
         height: 100vh;
         display: flex;
+        flex-wrap: nowrap; /* Prevent wrapping */
         background: #0a0a0a;
         color: #f0f0f0;
       }
 
       #sidebar {
         width: 280px;
+        min-width: 280px; /* Ensure it doesn't shrink */
+        max-width: 280px; /* Ensure it doesn't grow */
         background: #1a1a1a;
         border-right: 1px solid #333;
         display: flex;
         flex-direction: column;
         overflow: hidden;
+        flex-shrink: 0; /* Prevent flex from shrinking it */
+        z-index: 10; /* Ensure it stays on top */
       }
 
       #sidebar-header {
@@ -102,9 +107,11 @@
 
       #main-content {
         flex: 1;
+        min-width: 0; /* Allow flexbox to shrink below content size */
         display: flex;
         flex-direction: column;
         position: relative;
+        overflow: hidden; /* Prevent overflow from breaking layout */
       }
 
       #terminal {
@@ -657,33 +664,33 @@
           const input = userInput.value.trim();
           userInput.value = '';
           
-          if (!input) return;
+          // Echo what was typed (even if empty for visual feedback)
+          if (input) {
+            writeLine('$ ' + input, '#bd93f9');
+          }
           
-          // Echo what was typed
-          writeLine('$ ' + input, '#bd93f9');
-          
-          // Check if this is a command or input to running process
-          // If there's a running process, send as input
-          // Otherwise, treat as a new command
+          // Always send to process (including empty lines for "skip" scenarios)
           if (ws.readyState === WebSocket.OPEN) {
             // Try to detect if it's a new command vs process input
             // For simplicity, we'll send as command if it starts with known commands
-            const isCommand = input.startsWith('cli') || 
-                            input.startsWith('deno') || 
-                            input.startsWith('ls') || 
-                            input.startsWith('cat') ||
-                            input.startsWith('pwd') ||
-                            input.startsWith('cd') ||
-                            input === 'clear';
+            const isCommand = input && (
+              input.startsWith('cli') || 
+              input.startsWith('deno') || 
+              input.startsWith('ls') || 
+              input.startsWith('cat') ||
+              input.startsWith('pwd') ||
+              input.startsWith('cd') ||
+              input === 'clear'
+            );
             
             if (isCommand) {
               // Run as new command
               ws.send(JSON.stringify({ type: 'run_command', command: input }));
               console.log('📤 Sent command:', input);
             } else {
-              // Send as input to running process
+              // Send as input to running process (including empty lines)
               ws.send(JSON.stringify({ type: 'input', data: input + '\n' }));
-              console.log('📤 Sent input:', input);
+              console.log('📤 Sent input:', input || '(empty line)');
             }
           }
           
