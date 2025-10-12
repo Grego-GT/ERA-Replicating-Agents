@@ -17,6 +17,7 @@
   "tasks": {
     "cli": "deno run --allow-read --allow-write --allow-env --allow-net --allow-sys cli.ts",
     "cli:create": "deno run --allow-read --allow-write --allow-env --allow-net --allow-sys cli.ts create",
+    "cli:promote": "deno run --allow-read --allow-write --allow-env --allow-net --allow-sys cli.ts promote",
     "dev": "deno run --allow-net --allow-read --allow-env --allow-sys --watch main.ts",
     "serve": "deno serve --port 9995 --watch --allow-read --allow-env --allow-write --allow-net --allow-sys --allow-import ./main.ts",
     "git": "git add . && git commit -m 'bump' && git push origin main",
@@ -37,6 +38,8 @@
     "test:npm-codegen": "deno run --allow-net --allow-read --allow-env --allow-sys tests/test-npm-codegen.ts",
     "test:e2e-agent": "deno run --allow-net --allow-read --allow-write --allow-env --allow-sys tests/test-e2e-agent-creation.ts",
     "test:jokemeister": "deno run --allow-read --allow-env tests/test-simple-jokemeister.ts",
+    "test:create-util": "deno run --allow-read --allow-env tests/test-util-creation.ts",
+    "test:promotion": "deno run --allow-read --allow-env tests/test-promotion.ts",
     "demo:daytona": "deno run --allow-net --allow-read --allow-env --allow-sys tests/daytona/demo.ts"
   },
   "$schema": "https://raw.githubusercontent.com/denoland/deno/348900b8b79f4a434cab4c74b3bc8d4d2fa8ee74/cli/schemas/config-file.v1.json",

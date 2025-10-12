@@ -216,10 +216,12 @@ async function createAgentWithAI(
   name: string,
   promptText: string,
   maxIterations: number = 3,
-  previousResult?: any
+  previousResult?: any,
+  isUtility: boolean = false
 ): Promise<any> {
-  // Check if agent already exists
-  const agentDir = join(Deno.cwd(), 'agents', name);
+  // Determine base directory: utils/ for utilities, agents/ for agents
+  const baseDir = isUtility ? 'utils' : 'agents';
+  const agentDir = join(Deno.cwd(), baseDir, name);
   const agentJsonPath = join(agentDir, 'agent.json');
   const indexTsPath = join(agentDir, 'index.ts');
   
@@ -246,7 +248,9 @@ async function createAgentWithAI(
     }
   }
   
-  console.log(colorize(`\n🤖 ${isContinuation ? 'Continuing' : 'Creating'} agent: ${colorize(name, 'bold')}`, 'green'));
+  const entityType = isUtility ? 'utility' : 'agent';
+  console.log(colorize(`\n🤖 ${isContinuation ? 'Continuing' : 'Creating'} ${entityType}: ${colorize(name, 'bold')}`, 'green'));
+  console.log(colorize(`📁 Location: ${colorize(baseDir + '/' + name, 'bold')}`, 'cyan'));
   console.log(colorize(`💬 Prompt: ${colorize(promptText, 'bold')}`, 'blue'));
   console.log(colorize(`🔄 Max iterations: ${colorize(maxIterations.toString(), 'bold')}`, 'gray'));
   console.log(
@@ -341,8 +345,9 @@ Please generate the complete, improved agent code.
     }
 
     // Prepare agent files using FBI prep module
-    console.log(colorize('\n📦 Preparing agent files...', 'gray'));
+    console.log(colorize(`\n📦 Preparing ${entityType} files...`, 'gray'));
     const prepResult = await prepareAgentFiles(result, {
+      baseDir, // Use utils/ or agents/ based on flag
       existingHistory: existingHistory // Pass existing history for merging if continuation
     });
 
@@ -352,7 +357,7 @@ Please generate the complete, improved agent code.
 
     console.log(
       colorize(
-        `\n   ✨ AI-generated agent created at: ${colorize(prepResult.files.indexFile, 'bold')}`,
+        `\n   ✨ AI-generated ${entityType} created at: ${colorize(prepResult.files.indexFile, 'bold')}`,
         'green'
       )
     );
@@ -573,14 +578,41 @@ async function handleCommandLine(args: string[]): Promise<void> {
   
   const flags = parse(args, {
     string: ['prompt', 'p', 'iterations', 'i'],
-    boolean: ['ai', 'simple'],
+    boolean: ['ai', 'simple', 'util', 'utility'],
     alias: { p: 'prompt', i: 'iterations' },
-    default: { ai: false, simple: false, iterations: defaultIterations },
+    default: { ai: false, simple: false, iterations: defaultIterations, util: false, utility: false },
   });
 
   const command = flags._[0]?.toString();
 
-  if (command === 'create') {
+  if (command === 'promote') {
+    // Import promoter dynamically
+    const { promoteAgent } = await import('./core/promoter.ts');
+    
+    const name = flags._[1]?.toString();
+    if (!name) {
+      console.log(colorize('❌ Error: Agent name is required', 'red'));
+      console.log(colorize('Usage: deno task cli:promote <agent-name> [--dry-run] [--force]', 'gray'));
+      Deno.exit(1);
+    }
+
+    const dryRun = flags['dry-run'] || false;
+    const force = flags.force || false;
+
+    const result = await promoteAgent({ agentName: name, dryRun, force });
+    
+    if (!result.success) {
+      console.log(colorize(`\n❌ Promotion failed: ${result.error}`, 'red'));
+      Deno.exit(1);
+    }
+
+    if (!dryRun) {
+      console.log(colorize('💡 Next steps:', 'cyan'));
+      console.log(colorize(`   1. Review: cat utils/${name}/examples.ts`, 'gray'));
+      console.log(colorize(`   2. Test: deno task test:registry`, 'gray'));
+      console.log(colorize(`   3. Use in agents: The utility is now discoverable!\n`, 'gray'));
+    }
+  } else if (command === 'create') {
     const name = flags._[1]?.toString();
 
     if (!name) {
@@ -605,8 +637,11 @@ async function handleCommandLine(args: string[]): Promise<void> {
     // Parse iterations (from --iterations flag or .env MAX_ITERATIONS)
     const maxIterations = parseInt(flags.iterations || defaultIterations, 10);
     
+    // Check if this should be a utility (saved to utils/ instead of agents/)
+    const isUtility = flags.util || flags.utility;
+    
     // Always use AI generation
-    await createAgentWithAI(name, promptText, maxIterations);
+    await createAgentWithAI(name, promptText, maxIterations, undefined, isUtility);
   } else if (command === 'help' || command === '--help' || command === '-h') {
     displayHelp();
   } else {
@@ -626,10 +661,13 @@ function displayHelp(): void {
   console.log('  • Smart defaults - just press Enter to accept suggestions');
   console.log('  • 🆕 Interactive refinement - improve generated code with natural language\n');
   console.log(colorize('Commands:', 'yellow'));
-  console.log('  create <name>           Create a new agent');
+  console.log('  create <name>           Create a new agent or utility');
+  console.log('  promote <name>          Promote agent to utility (AI generates examples.ts)');
   console.log('  help                    Show this help message\n');
   console.log(colorize('Options:', 'yellow'));
-  console.log('  -p, --prompt <text>     Agent prompt/instructions (required)\n');
+  console.log('  -p, --prompt <text>     Agent prompt/instructions (required)');
+  console.log('  -i, --iterations <N>    Max refinement iterations (default: 3)');
+  console.log('  --util, --utility       Save to utils/ instead of agents/ (promotes to stdlib)\n');
   console.log(colorize('Examples:', 'yellow'));
   console.log('  # Interactive mode (recommended) - with AI name suggestions & refinement');
   console.log('  deno task cli\n');
@@ -637,6 +675,11 @@ function displayHelp(): void {
   console.log('  deno task cli:create calculator -p "Create a calculator that adds two numbers"\n');
   console.log('  # With custom iterations (refinement retries)');
   console.log('  deno task cli:create factorial -p "Calculate factorial" --iterations 5\n');
+  console.log('  # Create as utility (saves to utils/ instead of agents/)');
+  console.log('  deno task cli:create my-http-client -p "HTTP client utility" --util\n');
+  console.log('  # Promote agent to utility (AI generates examples.ts)');
+  console.log('  deno task cli:promote jokemeister           # Move to utils/ with AI-generated examples.ts');
+  console.log('  deno task cli:promote jokemeister --dry-run # Preview what will be generated\n');
   console.log(colorize('About Iterations & Refinement:', 'yellow'));
   console.log('  The FBI Director will retry code generation + execution up to N times.');
   console.log('  Each retry refines the prompt based on previous errors.');
