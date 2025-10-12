@@ -8,7 +8,7 @@
 import { parse } from "https://deno.land/std@0.208.0/flags/mod.ts";
 import { exists } from "https://deno.land/std@0.208.0/fs/mod.ts";
 import { join } from "https://deno.land/std@0.208.0/path/mod.ts";
-import { Input, Select } from "@cliffy/prompt";
+import { Input } from "@cliffy/prompt";
 import { run as orchestratorRun } from "./core/fbi.ts";
 import { prepareAgentFiles } from "./core/prep.ts";
 import { simpleChat } from "./utils/wandb/index.ts";
@@ -81,6 +81,34 @@ async function select(message: string, choices: string[]): Promise<string> {
   }
   console.log(colorize("Invalid choice, please try again.", "red"));
   return await select(message, choices);
+}
+
+/**
+ * Number-based selection with name/value pairs (like Cliffy's Select)
+ */
+async function selectWithValue(
+  message: string,
+  options: Array<{ name: string; value: string }>
+): Promise<string> {
+  console.log(colorize(`\n? ${message}`, "cyan"));
+  options.forEach((option, idx) => {
+    console.log(colorize(`  ${idx + 1}. ${option.name}`, "cyan"));
+  });
+  console.log(colorize(`\n  Enter choice (1-${options.length}): `, "yellow"), "");
+  
+  const buf = new Uint8Array(1024);
+  const n = await Deno.stdin.read(buf);
+  if (n === null) return options[0].value;
+  
+  const input = new TextDecoder().decode(buf.subarray(0, n)).trim();
+  const idx = parseInt(input) - 1;
+  
+  if (idx >= 0 && idx < options.length) {
+    return options[idx].value;
+  }
+  
+  console.log(colorize("  ❌ Invalid choice, please try again.", "red"));
+  return await selectWithValue(message, options);
 }
 
 // ============================================================================
@@ -611,9 +639,9 @@ async function startInteractiveMode(): Promise<void> {
     console.log(); // Empty line for spacing
 
     // First: Show quick start menu with examples
-    const quickStartChoice = await Select.prompt({
-      message: "Choose a template or define your own:",
-      options: [
+    const quickStartChoice = await selectWithValue(
+      "Choose a template or define your own:",
+      [
         {
           name: "🔢 FizzBuzz Solver (Simple Demo)",
           value: "fizzbuzz",
@@ -638,9 +666,8 @@ async function startInteractiveMode(): Promise<void> {
           name: "✨ Define Your Own Agent",
           value: "custom",
         },
-      ],
-      hint: "↑↓ to navigate, Enter to select",
-    });
+      ]
+    );
 
     let promptText = "";
     let suggestedName = "";
@@ -720,14 +747,13 @@ async function startInteractiveMode(): Promise<void> {
     } else {
       // New entity - ask where to create it
       console.log(); // Empty line for spacing
-      const typeChoice = await Select.prompt({
-        message: "Where should this be created?",
-        options: [
+      const typeChoice = await selectWithValue(
+        "Where should this be created?",
+        [
           { name: "🧪 Experimental (agents/) - Test & iterate", value: "agent" },
           { name: "🏗️ Stable Utility (utils/) - Production-ready, reusable", value: "util" },
-        ],
-        hint: "↑↓ to navigate, Enter to select",
-      });
+        ]
+      );
       isUtility = typeChoice === "util";
     }
 
