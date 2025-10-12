@@ -752,7 +752,7 @@ async function startInteractiveMode(): Promise<void> {
       console.log(colorize(`   Prompt: "${promptText.substring(0, 80)}..."`, "gray"));
     } else if (quickStartChoice === "browserbase-browser") {
       promptText =
-        'Create an AI web browser agent using Stagehand that navigates to docs.stagehand.dev, uses observePage to find navigation elements, and uses extractFromPage with Zod schema to extract the page heading, description, and installation command';
+        'Create an AI web browser agent using Stagehand that navigates to news.ycombinator.com (Hacker News homepage), uses observePage to analyze the page structure, and uses extractFromPage with Zod schema to extract the top 10 story titles, URLs, and scores. Display them in a clean numbered list.';
       suggestedName = "ai-browser";
       console.log(colorize("\n🌐 AI Web Browser Template", "cyan"));
       console.log(colorize("   Demonstrates: Browserbase/Stagehand for AI-powered web browsing", "gray"));
