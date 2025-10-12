@@ -37,9 +37,6 @@ export interface ChatOptions {
   model?: string;
   messages?: ChatMessage[];
   systemPrompt?: string | null;
-  temperature?: number | null;
-  maxTokens?: number | null;
-  topP?: number | null;
 }
 
 /**
@@ -122,10 +119,7 @@ function getWandbConfig(): WandbConfig {
 async function llmConversation({
   model = Deno.env.get('AI_MODEL') || "Qwen/Qwen3-Coder-480B-A35B-Instruct",
   messages = [],
-  systemPrompt = null,
-  temperature = null,
-  maxTokens = null,
-  topP = null
+  systemPrompt = null
 }: ChatOptions): Promise<ChatCompletionResponse> {
   const startTime = Date.now();
   
@@ -151,11 +145,6 @@ async function llmConversation({
       model,
       messages: fullMessages
     };
-    
-    // Add optional parameters
-    if (temperature !== null) body.temperature = temperature;
-    if (maxTokens !== null) body.max_tokens = maxTokens;
-    if (topP !== null) body.top_p = topP;
     
     // Build headers
     const headers: Record<string, string> = {

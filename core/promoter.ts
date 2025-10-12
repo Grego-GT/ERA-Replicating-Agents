@@ -198,9 +198,7 @@ Generate the examples.ts file following the format specified in the system promp
     const response = await chat({
       model: Deno.env.get('AI_MODEL') || "Qwen/Qwen3-Coder-480B-A35B-Instruct",
       systemPrompt: EXAMPLES_GENERATION_PROMPT,
-      messages: [{ role: 'user', content: userPrompt }],
-      temperature: 0.3,
-      maxTokens: 2000
+      messages: [{ role: 'user', content: userPrompt }]
     });
 
     console.log('✅ examples.ts generated!\n');

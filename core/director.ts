@@ -36,8 +36,6 @@ export interface PromptImprovementOptions {
   context?: string;
   /** Model to use for improvement */
   model?: string;
-  /** Temperature for generation (lower = more focused) */
-  temperature?: number;
   /** Previous attempt information (for refinement) */
   previousAttempt?: {
     prompt?: string;
@@ -283,7 +281,6 @@ async function improvePrompt(
     language = 'typescript',
     context,
     model = Deno.env.get('AI_MODEL_DIRECTOR') || Deno.env.get('AI_MODEL') || "Qwen/Qwen3-Coder-480B-A35B-Instruct",
-    temperature = 0.3, // Lower temperature for more focused improvements
     previousAttempt
   } = options;
 
@@ -356,9 +353,7 @@ async function improvePrompt(
     const response = await chat({
       model,
       messages,
-      systemPrompt: DIRECTOR_SYSTEM_PROMPT,
-      temperature,
-      maxTokens: 2000
+      systemPrompt: DIRECTOR_SYSTEM_PROMPT
     });
 
     const content = response.choices[0].message.content;
@@ -528,9 +523,7 @@ async function makeVerdict(
     const response = await chat({
       model,
       messages,
-      systemPrompt: DIRECTOR_VERDICT_SYSTEM_PROMPT,
-      temperature: 0.2, // Lower for more consistent decisions
-      maxTokens: 1000
+      systemPrompt: DIRECTOR_VERDICT_SYSTEM_PROMPT
     });
 
     const content = response.choices[0].message.content;
@@ -632,9 +625,7 @@ async function generateDescription(
     const response = await chat({
       model: Deno.env.get('AI_MODEL_DIRECTOR') || Deno.env.get('AI_MODEL') || "Qwen/Qwen3-Coder-480B-A35B-Instruct",
       messages,
-      systemPrompt: DIRECTOR_DESCRIPTION_SYSTEM_PROMPT,
-      temperature: 0.3,
-      maxTokens: 200
+      systemPrompt: DIRECTOR_DESCRIPTION_SYSTEM_PROMPT
     });
 
     const content = response.choices[0].message.content;
