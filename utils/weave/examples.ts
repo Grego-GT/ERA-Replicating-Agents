@@ -106,11 +106,12 @@ export const WEAVE_NPM_DEPS = ['weave'];
 export const WEAVE_API_DOCS = `
 ### Available Utility: Weave Tracing
 
-Pre-loaded utility functions for observability and tracing:
+⚠️ IMPORTANT: These functions are PRE-LOADED and ready to use!
+DO NOT import or require 'weave' - just call the functions directly!
 
 **Initialization:**
 \`\`\`javascript
-// Initialize weave at the start of your code
+// Initialize weave at the start of your code (NO import needed!)
 await initWeave('my-project-name');
 \`\`\`
 

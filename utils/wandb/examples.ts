@@ -96,7 +96,10 @@ export const WANDB_NPM_DEPS = ['node-fetch@2'];
 export const WANDB_API_DOCS = `
 ### Available Utility: wandbChat()
 
-A pre-loaded utility function for making LLM inference calls via Wandb:
+⚠️ IMPORTANT: This function is PRE-LOADED and ready to use!
+DO NOT import or require it - just call wandbChat() directly!
+
+A pre-loaded utility function for making LLM inference calls:
 
 **Function Signature:**
 \`\`\`javascript
