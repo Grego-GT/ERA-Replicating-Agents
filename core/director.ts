@@ -282,7 +282,7 @@ async function improvePrompt(
     judgingCriteria,
     language = 'typescript',
     context,
-    model = "Qwen/Qwen3-Coder-480B-A35B-Instruct",
+    model = Deno.env.get('AI_MODEL_DIRECTOR') || Deno.env.get('AI_MODEL') || "Qwen/Qwen3-Coder-480B-A35B-Instruct",
     temperature = 0.3, // Lower temperature for more focused improvements
     previousAttempt
   } = options;
@@ -485,7 +485,7 @@ async function makeVerdict(
     maxIterations,
     currentIteration,
     language = 'typescript',
-    model = "Qwen/Qwen3-Coder-480B-A35B-Instruct"
+    model = Deno.env.get('AI_MODEL_DIRECTOR') || Deno.env.get('AI_MODEL') || "Qwen/Qwen3-Coder-480B-A35B-Instruct"
   } = options;
 
   try {
@@ -630,7 +630,7 @@ async function generateDescription(
     ];
 
     const response = await chat({
-      model: "Qwen/Qwen3-Coder-480B-A35B-Instruct",
+      model: Deno.env.get('AI_MODEL_DIRECTOR') || Deno.env.get('AI_MODEL') || "Qwen/Qwen3-Coder-480B-A35B-Instruct",
       messages,
       systemPrompt: DIRECTOR_DESCRIPTION_SYSTEM_PROMPT,
       temperature: 0.3,

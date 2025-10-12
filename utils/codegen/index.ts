@@ -146,7 +146,7 @@ function extractCode(response: string): string | null {
 export async function generateCode(
   userPrompt: string, 
   maxRetries: number = 3, 
-  model: string = "Qwen/Qwen3-Coder-480B-A35B-Instruct"
+  model: string = Deno.env.get('AI_MODEL_CODEGEN') || Deno.env.get('AI_MODEL') || "Qwen/Qwen3-Coder-480B-A35B-Instruct"
 ): Promise<GeneratedCodeResult> {
   // Get available utilities dynamically
   const utilityDocs = await generateUtilityPrompt(true);

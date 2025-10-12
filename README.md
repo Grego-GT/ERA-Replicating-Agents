@@ -2,15 +2,24 @@
 
 **Era of Rapid Agents** - Create AI agents with custom prompts using Deno.
 
-A comprehensive Deno-native project featuring:
+## 🌟 Self-Improving Meta-Programming System
+
+ERA doesn't just generate code—it **improves itself**. Every agent you create becomes a reusable utility for future agents. The system:
+
+- ✨ **Self-replicates**: Generated agents can be promoted to utilities and injected into new agents
+- 🔄 **Self-corrects**: FBI Director reviews, refines, and iterates on generated code automatically
+- 🧬 **Compounding growth**: Each new agent expands the capabilities of the entire system
+
+## Features
 
 - 🤖 **CLI Tool** - Create and manage AI agents with custom prompts
-- 🧠 **FBI System** - AI-powered agent orchestration with prompt improvement
+- 🧠 **FBI System** - AI-powered agent orchestration with prompt improvement & iteration
+- 🏗️ **Utility Promotion** - AI converts agents to injectable utilities with `examples.ts`
 - 🌐 **Web Server** - Hono-based server with Alpine.js frontend
 - ☁️ **Integrations** - Daytona sandbox, Wandb AI, and Weave tracing
 
-> **📢 Note**: Project structure organized as `core/` (orchestration) & `utils/` (helpers)  
-> See [ARCHITECTURE.md](ARCHITECTURE.md) for complete documentation.
+> **📢 Note**: Project structure organized as `core/` (orchestration), `utils/` (stdlib), `agents/` (generated)\
+> See [ARCHITECTURE.md](ARCHITECTURE.md) for system design, [WORKFLOWS.md](WORKFLOWS.md) for usage patterns.
 
 ---
 
@@ -83,16 +92,22 @@ AgFactory/
 deno task cli
 ```
 
-This starts an interactive prompt with the following workflow:
+This starts an interactive prompt with **Quick Start Templates**:
 
-1. **Describe** what you want the agent to do
-2. **AI suggests** an agent name (or provide your own)
-3. **Generate** code using FBI Director + AI code generation
-4. **Refine** (optional) - improve the code with natural language feedback
-5. **Iterate** - keep refining until you're satisfied
+1. **Choose a template** or define your own:
+   - 🎭 **Joke Generator** - WandbChat + Weave tracing demo
+   - 🔍 **Web Search Agent** - Tavily search demo
+   - 🌐 **AI Web Browser** - Browserbase/Stagehand AI browsing demo
+   - 🤖 **Multi-Agent System** - Mastra framework with agents & workflows
+   - ✨ **Define Your Own** - Custom agent with AI-suggested name
+2. **Generate** code using FBI Director + AI code generation
+3. **Choose location** - agents/ (experimental) or utils/ (stable)
+4. **Refine** (optional) - improve with natural language feedback
+5. **Promote** (optional) - convert agent to reusable utility
 
-**New: Interactive Refinement** 💡  
+**New: Interactive Refinement** 💡\
 After successful generation, you can refine the code by describing improvements:
+
 - "Add error handling"
 - "Make it faster with async/await"
 - "Add more test cases"
@@ -100,12 +115,48 @@ After successful generation, you can refine the code by describing improvements:
 
 Each refinement creates a new iteration while preserving history.
 
-**New: Agent Continuation** 🔄  
+**New: Agent Continuation** 🔄\
 Using an existing agent name automatically continues development:
+
 - Loads previous code and history
 - Builds upon existing functionality
 - Preserves all previous attempts
 - Tracks sessions across CLI invocations
+
+#### Self-Improving Example 🌟
+
+```bash
+# 1. Create a joke-telling agent
+deno task cli:create jokemeister --prompt "tell jokes with tracing"
+
+# 2. Create an agent that USES the first agent
+deno task cli:create joke-rater --prompt "rate jokes from jokemeister"
+
+# 3. Promote to reusable utility (AI generates injection code)
+deno task cli:promote jokemeister --dry-run  # Preview
+deno task cli:promote jokemeister            # Execute
+
+# 4. Now jokemeister is injectable into ALL future agents!
+# The system grew its own capabilities 🚀
+```
+
+#### Quick Start
+
+Try these pre-configured examples:
+
+```bash
+# Joke Generator (WandbChat + Weave demo)
+deno task start:jokemeister
+
+# Web Search Agent (Tavily demo)
+deno task start:tavily
+
+# AI Web Browser (Browserbase/Stagehand demo)
+deno task start:browserbase
+
+# Multi-Agent System (Mastra framework demo)
+deno task start:mastra
+```
 
 #### Command Line Mode
 
@@ -218,6 +269,15 @@ DAYTONA_API_URL=https://api.daytona.io
 WANDB_API_KEY=your_wandb_key
 WANDB_PROJECT=your-team/your-project
 
+# AI Model Configuration
+# Default model for Director, FBI, and Code Generation
+AI_MODEL=Qwen/Qwen3-Coder-480B-A35B-Instruct
+
+# Optional: Override specific models for different components
+# AI_MODEL_DIRECTOR=Qwen/Qwen3-Coder-480B-A35B-Instruct
+# AI_MODEL_CODEGEN=Qwen/Qwen3-Coder-480B-A35B-Instruct
+# AI_MODEL_FBI=Qwen/Qwen3-Coder-480B-A35B-Instruct
+
 # Groq Configuration (for core/main.js)
 GROQ_API_KEY=your_groq_key
 
@@ -231,6 +291,66 @@ WEBHOOK_PATH=/webhook
 SALESFORCE_MCP_URL=your_salesforce_mcp_url
 PARALLEL_API_KEY=your_parallel_api_key
 ```
+
+### AI Model Configuration
+
+ERA uses environment variables to configure AI models, making it easy to switch models without changing code:
+
+#### Default Model (`AI_MODEL`)
+
+The `AI_MODEL` environment variable sets the default model for all AI operations:
+
+```env
+AI_MODEL=Qwen/Qwen3-Coder-480B-A35B-Instruct
+```
+
+This model is used across:
+
+- **FBI Director** - Prompt improvement and verdict decisions
+- **Code Generation** - Generating agent code from prompts
+- **FBI Orchestrator** - Overall orchestration
+- **Utility Promotion** - Converting agents to utilities
+
+#### Component-Specific Overrides
+
+You can override the model for specific components:
+
+```env
+# Override Director model (for prompt refinement)
+AI_MODEL_DIRECTOR=Qwen/Qwen3-Coder-480B-A35B-Instruct
+
+# Override Code Generation model
+AI_MODEL_CODEGEN=Qwen/Qwen3-Coder-480B-A35B-Instruct
+
+# Override FBI Orchestrator model
+AI_MODEL_FBI=Qwen/Qwen3-Coder-480B-A35B-Instruct
+```
+
+**Priority order**: Component-specific env var → `AI_MODEL` → Hardcoded default
+
+#### Examples
+
+**Use a different model for all operations:**
+
+```env
+AI_MODEL=meta-llama/Llama-3.3-70B-Instruct
+```
+
+**Use GPT-4 for Director decisions, but Qwen for code generation:**
+
+```env
+AI_MODEL_DIRECTOR=gpt-4-turbo-preview
+AI_MODEL_CODEGEN=Qwen/Qwen3-Coder-480B-A35B-Instruct
+```
+
+**Use the default Qwen model everywhere:**
+
+```env
+# Just set AI_MODEL or leave it unset to use the built-in default
+AI_MODEL=Qwen/Qwen3-Coder-480B-A35B-Instruct
+```
+
+> **Note**: The naming AI (for suggesting agent names) currently uses a hardcoded model and doesn't read from environment variables.
 
 ### Deno Configuration
 
@@ -316,6 +436,7 @@ What would you like to improve?: Add input validation and better error messages
 ```
 
 The Director will:
+
 - Understand your feedback
 - Build context from previous successful code
 - Generate an improved version
@@ -325,11 +446,13 @@ The Director will:
 ### Iteration History
 
 Every attempt is preserved:
+
 - `agent.json` contains ALL attempts with prompts, code, and results
 - `iterations/` folder has timestamped snapshots of each version
 - `index.ts` always has the latest/best version
 
 This means:
+
 - ✅ Never lose work
 - ✅ Review what changed between iterations
 - ✅ Rollback if needed
@@ -370,6 +493,7 @@ Would you like to refine/improve this agent? (y/n): n
 ```
 
 **Result:**
+
 - `agents/string-reverser/index.ts` - Your refined agent
 - `agents/string-reverser/agent.json` - Full history of both attempts
 - `agents/string-reverser/iterations/` - Snapshots of each version
@@ -489,6 +613,28 @@ The project also supports:
 
 - Use Deno fmt: `deno fmt`
 - Use Deno lint: `deno lint`
+
+---
+
+## 📚 Documentation
+
+- **[WORKFLOWS.md](WORKFLOWS.md)** - Complete workflows: experimental agents, stable utilities, AI-powered promotion
+- **[ARCHITECTURE.md](ARCHITECTURE.md)** - System design: core/, utils/, agents/ separation and philosophy
+- **[CLI-IMPROVEMENTS.md](CLI-IMPROVEMENTS.md)** - Interactive type selection, smart defaults, promotion workflow
+- **[UTILITY-PROMOTION.md](UTILITY-PROMOTION.md)** - Deep dive into the promotion system and examples.ts generation
+- **[NPM-PACKAGES-GUIDE.md](NPM-PACKAGES-GUIDE.md)** - How generated agents can use npm packages in Daytona
+
+### Quick Reference
+
+```bash
+# Workflows
+deno task test:create-util    # Guide for creating utilities
+deno task test:promotion       # Guide for promoting agents
+
+# System
+deno task test:registry        # See all available utilities
+deno task test:e2e-agent       # Test self-improving loop
+```
 
 ---
 

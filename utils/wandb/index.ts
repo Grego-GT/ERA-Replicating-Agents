@@ -118,7 +118,7 @@ function getWandbConfig(): WandbConfig {
  * @returns The completion response
  */
 async function llmConversation({
-  model = "Qwen/Qwen3-Coder-480B-A35B-Instruct",
+  model = Deno.env.get('AI_MODEL') || "Qwen/Qwen3-Coder-480B-A35B-Instruct",
   messages = [],
   systemPrompt = null,
   temperature = null,

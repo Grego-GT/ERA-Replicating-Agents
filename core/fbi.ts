@@ -339,7 +339,7 @@ async function dispatchAgents(
     maxRetries = 3, // Retries for code generation extraction
     maxIterations = 3, // Full refinement iterations (director -> generate -> execute)
     language = 'typescript',
-    model = "Qwen/Qwen3-Coder-480B-A35B-Instruct",
+    model = Deno.env.get('AI_MODEL_FBI') || Deno.env.get('AI_MODEL') || "Qwen/Qwen3-Coder-480B-A35B-Instruct",
     logCallback = null,
     agentName = 'unnamed-agent',
     systemPrompt = undefined,

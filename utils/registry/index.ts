@@ -97,6 +97,54 @@ async function loadBuiltinUtilities(): Promise<Map<string, UtilityEntry>> {
     console.warn('Failed to load weave utility:', error);
   }
   
+  try {
+    // Load tavily utility
+    const { TAVILY_NODE_UTIL, TAVILY_NPM_DEPS, TAVILY_API_DOCS } = await import('../tavily/examples.ts');
+    builtins.set('tavily', {
+      name: 'tavily',
+      type: 'builtin',
+      description: 'AI-powered web search with real-time results',
+      nodeUtil: TAVILY_NODE_UTIL,
+      npmDeps: TAVILY_NPM_DEPS,
+      apiDocs: TAVILY_API_DOCS,
+      sourcePath: 'utils/tavily/examples.ts'
+    });
+  } catch (error) {
+    console.warn('Failed to load tavily utility:', error);
+  }
+  
+  try {
+    // Load browserbase utility
+    const { STAGEHAND_NODE_UTIL, STAGEHAND_NPM_DEPS, STAGEHAND_API_DOCS } = await import('../browserbase/examples.ts');
+    builtins.set('browserbase', {
+      name: 'browserbase',
+      type: 'builtin',
+      description: 'AI-powered web browsing with Stagehand and Playwright',
+      nodeUtil: STAGEHAND_NODE_UTIL,
+      npmDeps: STAGEHAND_NPM_DEPS,
+      apiDocs: STAGEHAND_API_DOCS,
+      sourcePath: 'utils/browserbase/examples.ts'
+    });
+  } catch (error) {
+    console.warn('Failed to load browserbase utility:', error);
+  }
+  
+  try {
+    // Load mastra utility
+    const { MASTRA_NODE_UTIL, MASTRA_NPM_DEPS, MASTRA_API_DOCS } = await import('../mastra/examples.ts');
+    builtins.set('mastra', {
+      name: 'mastra',
+      type: 'builtin',
+      description: 'TypeScript agent framework with agents, workflows, RAG, and evals',
+      nodeUtil: MASTRA_NODE_UTIL,
+      npmDeps: MASTRA_NPM_DEPS,
+      apiDocs: MASTRA_API_DOCS,
+      sourcePath: 'utils/mastra/examples.ts'
+    });
+  } catch (error) {
+    console.warn('Failed to load mastra utility:', error);
+  }
+
   return builtins;
 }
 
