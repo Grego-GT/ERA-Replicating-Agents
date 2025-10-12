@@ -14,6 +14,14 @@ const activeConnections = new Set<WebSocket>();
 
 // Broadcast user count to all connected clients
 function broadcastUserCount() {
+  // Clean up closed connections first
+  activeConnections.forEach((socket) => {
+    if (socket.readyState === WebSocket.CLOSED || socket.readyState === WebSocket.CLOSING) {
+      activeConnections.delete(socket);
+      console.log(`🧹 Cleaned up closed connection`);
+    }
+  });
+  
   const count = activeConnections.size;
   const message = JSON.stringify({ type: 'user_count', count });
   
@@ -27,12 +35,21 @@ function broadcastUserCount() {
         successCount++;
       } catch (error) {
         console.error('Error broadcasting user count:', error);
+        // Mark for cleanup
+        activeConnections.delete(socket);
       }
     }
   });
   
   console.log(`✅ Successfully sent to ${successCount}/${activeConnections.size} connections`);
 }
+
+// Periodic heartbeat to keep user count updated and clean up stale connections
+setInterval(() => {
+  broadcastUserCount();
+}, 30000); // Every 30 seconds
+
+console.log("⏰ User count heartbeat started (30s interval)");
 
 const MIME_TYPES: Record<string, string> = {
   ".html": "text/html",
@@ -131,6 +148,13 @@ function handleWebSocket(socket: WebSocket) {
   socket.onmessage = async (event) => {
     try {
       const data = JSON.parse(event.data);
+      
+      // Handle heartbeat ping
+      if (data.type === 'ping') {
+        socket.send(JSON.stringify({ type: 'pong' }));
+        console.log('💓 Heartbeat ping received, pong sent');
+        return;
+      }
       
       if (data.type === 'start_cli' || data.type === 'run_command') {
         // Close existing process if any

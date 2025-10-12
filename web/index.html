@@ -36,6 +36,7 @@
         flex-wrap: nowrap; /* Prevent wrapping */
         background: #0a0a0a;
         color: #f0f0f0;
+        position: relative;
       }
 
       #sidebar {
@@ -48,7 +49,79 @@
         flex-direction: column;
         overflow: hidden;
         flex-shrink: 0; /* Prevent flex from shrinking it */
-        z-index: 10; /* Ensure it stays on top */
+        z-index: 1000; /* Ensure it stays on top */
+        transition: transform 0.3s ease;
+      }
+
+      /* Mobile: Sidebar becomes overlay */
+      @media (max-width: 768px) {
+        #sidebar {
+          position: fixed;
+          left: 0;
+          top: 0;
+          height: 100vh;
+          transform: translateX(-100%);
+          box-shadow: 2px 0 10px rgba(0, 0, 0, 0.5);
+        }
+
+        #sidebar.open {
+          transform: translateX(0);
+        }
+
+        #main-content {
+          margin-left: 0 !important;
+        }
+      }
+
+      /* Sidebar toggle button for mobile */
+      #sidebar-toggle {
+        display: none;
+        position: fixed;
+        top: 20px;
+        left: 20px;
+        z-index: 999;
+        background: #50fa7b;
+        border: none;
+        border-radius: 8px;
+        padding: 10px 14px;
+        cursor: pointer;
+        font-size: 20px;
+        box-shadow: 0 2px 10px rgba(80, 250, 123, 0.3);
+        transition: all 0.3s ease;
+      }
+
+      #sidebar-toggle:hover {
+        background: #6cffb1;
+        box-shadow: 0 4px 15px rgba(80, 250, 123, 0.5);
+        transform: scale(1.05);
+      }
+
+      #sidebar-toggle:active {
+        transform: scale(0.95);
+      }
+
+      @media (max-width: 768px) {
+        #sidebar-toggle {
+          display: block;
+        }
+      }
+
+      /* Overlay backdrop for mobile */
+      #sidebar-backdrop {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 999;
+      }
+
+      @media (max-width: 768px) {
+        #sidebar-backdrop.show {
+          display: block;
+        }
       }
 
       #sidebar-header {
@@ -237,14 +310,76 @@
         padding: 8px 16px;
         border-radius: 8px;
         border: 1px solid #50fa7b;
-        z-index: 1000;
+        z-index: 998;
         font-size: 13px;
         color: #50fa7b;
         font-weight: bold;
+        transition: all 0.3s ease;
+      }
+
+      .user-count.updated {
+        background: rgba(80, 250, 123, 0.2);
+        box-shadow: 0 0 20px rgba(80, 250, 123, 0.3);
+        transform: scale(1.05);
       }
 
       .user-count-icon {
         font-size: 16px;
+        animation: pulse-icon 2s ease-in-out infinite;
+      }
+
+      @keyframes pulse-icon {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.1); }
+      }
+
+      /* Mobile responsive adjustments */
+      @media (max-width: 768px) {
+        .user-count {
+          top: 80px;
+          right: 10px;
+          left: auto;
+          font-size: 11px;
+          padding: 6px 10px;
+        }
+
+        .status-indicator {
+          top: 20px;
+          right: 10px;
+          font-size: 11px;
+          padding: 6px 10px;
+        }
+
+        .user-count-icon {
+          font-size: 14px;
+        }
+
+        .status-dot {
+          width: 6px;
+          height: 6px;
+        }
+
+        #keyboard-hint {
+          font-size: 10px;
+          padding: 6px 8px;
+        }
+
+        #terminal {
+          padding: 10px;
+          font-size: 12px;
+        }
+
+        #input-container {
+          padding: 10px;
+        }
+
+        #user-input {
+          font-size: 12px;
+        }
+
+        #prompt {
+          font-size: 14px;
+        }
       }
 
       #refresh-files {
@@ -308,6 +443,12 @@
     </style>
   </head>
   <body>
+    <!-- Sidebar toggle button (mobile only) -->
+    <button id="sidebar-toggle" aria-label="Toggle sidebar">☰</button>
+
+    <!-- Sidebar backdrop (mobile only) -->
+    <div id="sidebar-backdrop"></div>
+
     <div id="root">
       <!-- Sidebar File Explorer -->
       <div id="sidebar">
@@ -359,10 +500,17 @@
       const refreshBtn = document.getElementById('refresh-files');
       const copyIndicator = document.getElementById('copy-indicator');
       const userCountText = document.getElementById('user-count-text');
+      const userCountEl = document.querySelector('.user-count');
+      const sidebar = document.getElementById('sidebar');
+      const sidebarToggle = document.getElementById('sidebar-toggle');
+      const sidebarBackdrop = document.getElementById('sidebar-backdrop');
       
       let ws = null;
       let currentPath = '..';
       let currentRelativePath = '..';
+      let heartbeatInterval = null;
+      let reconnectAttempts = 0;
+      const MAX_RECONNECT_ATTEMPTS = 5;
 
       // ANSI color map
       const ansiColors = {
@@ -568,11 +716,18 @@
         console.log('🔌 Connecting to:', wsUrl);
         setStatus('connecting');
 
+        // Clear any existing heartbeat
+        if (heartbeatInterval) {
+          clearInterval(heartbeatInterval);
+          heartbeatInterval = null;
+        }
+
         ws = new WebSocket(wsUrl);
 
         ws.onopen = () => {
           console.log('✅ WebSocket connected');
           setStatus('connected');
+          reconnectAttempts = 0; // Reset reconnect counter
           
           writeHTML('<span style="color: #50fa7b;">╔════════════════════════════════════════════════════════════════╗</span>');
           writeHTML('<span style="color: #50fa7b;">║              🏭  AgFactory Web Terminal                        ║</span>');
@@ -582,6 +737,14 @@
           writeLine('✅ Connected! Starting AgFactory CLI...', '#8be9fd');
           writeLine('💡 Type your response and press Enter. Use Ctrl+C to interrupt.', '#888');
           writeLine('');
+
+          // Start heartbeat to keep connection alive
+          heartbeatInterval = setInterval(() => {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+              ws.send(JSON.stringify({ type: 'ping' }));
+              console.log('💓 Heartbeat sent');
+            }
+          }, 30000); // Every 30 seconds
 
           // Start the CLI
           ws.send(JSON.stringify({ type: 'start_cli' }));
@@ -616,9 +779,21 @@
               // Update user count display
               const count = message.count;
               const plural = count === 1 ? 'user' : 'users';
+              const oldCount = userCountText.textContent;
               userCountText.textContent = `${count} ${plural} online`;
+              
+              // Add pulse effect if count changed
+              if (oldCount !== userCountText.textContent) {
+                userCountEl.classList.add('updated');
+                setTimeout(() => {
+                  userCountEl.classList.remove('updated');
+                }, 500);
+              }
+              
               console.log(`👥 Received user_count: ${count} ${plural} online`);
-              console.log(`👥 Updated display element:`, userCountText);
+            } else if (message.type === 'pong') {
+              // Heartbeat response received
+              console.log('💓 Heartbeat acknowledged');
             } else {
               console.log('📨 Unknown message type:', message.type, message);
             }
@@ -630,16 +805,41 @@
         ws.onerror = (error) => {
           console.error('❌ WebSocket error:', error);
           setStatus('disconnected');
-          writeLine('');
-          writeLine('❌ Connection error', '#ff5555');
         };
 
-        ws.onclose = () => {
-          console.log('🔌 WebSocket closed');
+        ws.onclose = (event) => {
+          console.log('🔌 WebSocket closed, code:', event.code, 'reason:', event.reason);
           setStatus('disconnected');
-          writeLine('');
-          writeLine('⚠️  Connection closed', '#f1fa8c');
-          writeLine('💡 Refresh to reconnect', '#8be9fd');
+          
+          // Clear heartbeat
+          if (heartbeatInterval) {
+            clearInterval(heartbeatInterval);
+            heartbeatInterval = null;
+          }
+
+          // Attempt auto-reconnect if not a normal closure and haven't exceeded max attempts
+          if (event.code !== 1000 && reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+            reconnectAttempts++;
+            const delay = Math.min(1000 * Math.pow(2, reconnectAttempts - 1), 30000); // Exponential backoff, max 30s
+            
+            writeLine('');
+            writeLine(`⚠️  Connection lost (attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`, '#f1fa8c');
+            writeLine(`💡 Reconnecting in ${Math.round(delay/1000)}s...`, '#8be9fd');
+            
+            console.log(`🔄 Reconnecting in ${delay}ms...`);
+            setTimeout(() => {
+              console.log('🔄 Attempting reconnect...');
+              connectWebSocket();
+            }, delay);
+          } else if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+            writeLine('');
+            writeLine('❌ Connection lost after multiple attempts', '#ff5555');
+            writeLine('💡 Please refresh the page to reconnect', '#8be9fd');
+          } else {
+            writeLine('');
+            writeLine('⚠️  Connection closed', '#f1fa8c');
+            writeLine('💡 Refresh to reconnect', '#8be9fd');
+          }
         };
       }
 
@@ -775,6 +975,41 @@
         e.stopPropagation();
         console.log('🔄 Refresh clicked, relative path:', currentRelativePath);
         loadFiles(currentRelativePath);
+      });
+
+      // Mobile sidebar toggle
+      function toggleSidebar() {
+        const isOpen = sidebar.classList.contains('open');
+        if (isOpen) {
+          sidebar.classList.remove('open');
+          sidebarBackdrop.classList.remove('show');
+        } else {
+          sidebar.classList.add('open');
+          sidebarBackdrop.classList.add('show');
+        }
+      }
+
+      sidebarToggle.addEventListener('click', (e) => {
+        e.stopPropagation();
+        toggleSidebar();
+      });
+
+      // Close sidebar when clicking backdrop
+      sidebarBackdrop.addEventListener('click', () => {
+        toggleSidebar();
+      });
+
+      // Close sidebar when clicking inside (after selecting a file/folder on mobile)
+      sidebar.addEventListener('click', (e) => {
+        // Only close on mobile
+        if (window.innerWidth <= 768) {
+          // Close after a short delay to allow the action to complete
+          setTimeout(() => {
+            if (sidebar.classList.contains('open')) {
+              toggleSidebar();
+            }
+          }, 300);
+        }
       });
 
       // Initialize

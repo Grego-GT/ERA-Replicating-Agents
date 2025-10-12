@@ -26,6 +26,12 @@ primary_region = 'sjc'
   min_machines_running = 0
   processes = ['app']
 
+  # Keep WebSocket connections alive during long-running operations
+  [http_service.concurrency]
+    type = "connections"
+    hard_limit = 250
+    soft_limit = 200
+
 [[vm]]
   cpu_kind = 'shared'
   cpus = 1

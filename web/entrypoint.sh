@@ -11,14 +11,14 @@ if [ -z "$(ls -A /app/agents 2>/dev/null)" ]; then
   echo "📦 Seeding agents directory with demo agents..."
   
   # Copy demo agents from the image if they exist
-  if [ -d "/app/agents_seed" ]; then
-    cp -r /app/agents_seed/* /app/agents/ 2>/dev/null || true
-    echo "✅ Demo agents copied"
+  if [ -d "/app/demo_agents" ]; then
+    cp -r /app/demo_agents/* /app/agents/ 2>/dev/null || true
+    echo "✅ Demo agents copied (jannn, poo, tryhard)"
   else
     echo "ℹ️  No demo agents found, starting with empty agents directory"
   fi
 else
-  echo "✅ Agents directory already populated"
+  echo "✅ Agents directory already populated ($(ls -1 /app/agents | wc -l) agents)"
 fi
 
 # Ensure proper permissions

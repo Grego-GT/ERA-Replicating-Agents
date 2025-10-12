@@ -15,8 +15,8 @@ COPY deno.json ./deno.json
 COPY core ./core
 COPY utils ./utils
 
-# Copy existing agents as seed data (will be used to populate volume on first run)
-COPY agents ./agents_seed
+# Copy demo agents (will be used to populate volume on first run)
+COPY demo_agents ./demo_agents
 
 # Create empty directories that might be needed
 RUN mkdir -p /app/daytona
