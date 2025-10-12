@@ -19,6 +19,16 @@
  */
 export const WEAVE_NODE_UTIL = `
 // === Weave Tracing Utility (Auto-injected) ===
+// Try to load .env file if it exists (for local runs)
+// Look for .env in current dir, parent dir, and grandparent dir
+try {
+  require('dotenv').config({ silent: true, path: '.env' }) || 
+  require('dotenv').config({ silent: true, path: '../.env' }) ||
+  require('dotenv').config({ silent: true, path: '../../.env' });
+} catch (e) {
+  // dotenv not available or .env doesn't exist - that's okay
+}
+
 const weave = require('weave');
 
 // Track initialization state
@@ -28,7 +38,9 @@ let weaveInitialized = false;
  * Initialize Weave tracing
  * Call this once at the start of your code
  */
-async function initWeave(projectName: string = 'agent-code'): Promise<void> {
+async function initWeave(projectName) {
+  if (!projectName) projectName = 'agent-code';
+  
   if (weaveInitialized) {
     return;
   }
@@ -36,11 +48,9 @@ async function initWeave(projectName: string = 'agent-code'): Promise<void> {
   try {
     await weave.init(projectName);
     weaveInitialized = true;
-    console.log(\`[Weave] Initialized project: \${projectName}\`);
-  } catch (error: unknown) {
-    const err = error as Error;
-    console.warn('[Weave] Failed to initialize:', err.message);
-    // Continue without tracing if init fails
+    // Silent init - only log failures
+  } catch (error) {
+    // Silent fail - continue without tracing
   }
 }
 
@@ -48,15 +58,13 @@ async function initWeave(projectName: string = 'agent-code'): Promise<void> {
  * Wrap a function with Weave tracing
  * This creates a traced version of your function
  */
-function traceFunction(fn: any, name?: string): any {
+function traceFunction(fn, name) {
   if (!name) name = fn.name || 'anonymous';
   
   try {
     return weave.op(fn);
-  } catch (error: unknown) {
-    const err = error as Error;
-    console.warn(\`[Weave] Failed to trace function \${name}:, err.message\`);
-    // Return original function if tracing fails
+  } catch (error) {
+    // Silent fail - return original function if tracing fails
     return fn;
   }
 }
@@ -69,21 +77,15 @@ function traceFunction(fn: any, name?: string): any {
  * Good examples: 'agent:fetch_joke', 'agent:generate_response', 'agent:validate_input'
  * Bad examples: 'process', 'handle', 'run'
  */
-function createTracedOp(operationName: string, fn: any): any {
+function createTracedOp(operationName, fn) {
   const namedFn = {
-    [operationName]: async function(...args: any[]) {
-      const startTime = Date.now();
-      console.log(\`[Weave] Starting: \${operationName}\`);
-      
+    [operationName]: async function(...args) {
+      // Silent execution - no logging to keep output clean
       try {
         const result = await fn(...args);
-        const duration = Date.now() - startTime;
-        console.log(\`[Weave] Completed: \${operationName} (\${duration}ms)\`);
         return result;
-      } catch (error: unknown) {
-        const err = error as Error;
-        const duration = Date.now() - startTime;
-        console.log(\`[Weave] Failed: \${operationName} (\${duration}ms) - \${err.message}\`);
+      } catch (error) {
+        // Re-throw without logging
         throw error;
       }
     }
@@ -96,8 +98,9 @@ function createTracedOp(operationName: string, fn: any): any {
 
 /**
  * NPM dependencies required for the weave utility
+ * Using dotenv for loading .env files when running locally
  */
-export const WEAVE_NPM_DEPS = ['weave'];
+export const WEAVE_NPM_DEPS = ['weave', 'dotenv'];
 
 /**
  * API documentation for teaching AI how to use the utility
@@ -142,8 +145,7 @@ const result = await tracedProcess(myData);
 
 // Example 3: Create a traced operation inline with NAMESPACED name
 // IMPORTANT: Use 'agent:operation_name' format for clarity in traces
-// CRITICAL: Add explicit types to ALL parameters to avoid TypeScript errors!
-const analyzeText = createTracedOp('agent:analyze_text', async (text: string) => {
+const analyzeText = createTracedOp('agent:analyze_text', async (text) => {
   // analysis logic
   return { score: 0.95, sentiment: 'positive' };
 });

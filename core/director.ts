@@ -516,8 +516,8 @@ async function makeVerdict(
     userMessage += `## Previous Attempts History:\n`;
     allAttempts.forEach((attempt) => {
       userMessage += `\n### Iteration ${attempt.iteration}:\n`;
-      userMessage += `Prompt Used:\n${attempt.prompt.substring(0, 300)}...\n\n`;
-      userMessage += `Code Generated (preview):\n\`\`\`${language}\n${attempt.code.substring(0, 400)}\n...\n\`\`\`\n\n`;
+      userMessage += `Prompt Used:\n${attempt.prompt}\n\n`;
+      userMessage += `Code Generated:\n\`\`\`${language}\n${attempt.code}\n\`\`\`\n\n`;
       userMessage += `Execution: ${attempt.executionSuccess ? '✅ SUCCESS' : '❌ FAILED'}\n`;
       
       if (!attempt.executionSuccess) {
@@ -525,12 +525,12 @@ async function makeVerdict(
           userMessage += `Error Type: ${attempt.errorType}\n`;
         }
         if (attempt.executionError) {
-          userMessage += `Error:\n${attempt.executionError.substring(0, 500)}\n`;
+          userMessage += `Error:\n${attempt.executionError}\n`;
         }
       }
       
       if (attempt.executionOutput) {
-        userMessage += `Output (preview):\n${attempt.executionOutput.substring(0, 300)}\n`;
+        userMessage += `Output:\n${attempt.executionOutput}\n`;
       }
     });
     

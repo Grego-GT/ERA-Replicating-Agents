@@ -430,7 +430,11 @@ Please generate the complete, improved agent code.
       if (result.execution.hasError) {
         console.log(colorize(`\n💥 Error Type: ${result.execution.errorType}`, "red"));
         if (result.execution.errorMessage) {
-          console.log(colorize(`📝 Details: ${result.execution.errorMessage.substring(0, 200)}`, "yellow"));
+          // Ensure error is properly stringified
+          const errorText = typeof result.execution.errorMessage === 'string'
+            ? result.execution.errorMessage
+            : JSON.stringify(result.execution.errorMessage, null, 2);
+          console.log(colorize(`📝 Details: ${errorText}`, "yellow"));
         }
       } else if (result.generation && !result.generation.success) {
         console.log(colorize("\n💥 Code generation failed", "red"));
@@ -541,13 +545,8 @@ Please generate the complete, improved agent code.
       output = output.replace(/\n{3,}/g, '\n\n').trim();
       
       if (output.length > 0) {
-        // Limit output to reasonable size for preview
-        const maxPreviewLength = 1000;
-        const previewOutput = output.length > maxPreviewLength 
-          ? output.substring(0, maxPreviewLength) + "\n\n   ... (output truncated, run agent to see full output)"
-          : output;
-        
-        console.log(previewOutput);
+        // Show full output (no truncation)
+        console.log(output);
       } else {
         console.log(colorize("   (Agent executed successfully but produced no visible output)", "gray"));
       }

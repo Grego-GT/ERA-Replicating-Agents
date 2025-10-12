@@ -19,6 +19,16 @@
  */
 export const WANDB_NODE_UTIL = `
 // === Wandb Chat Utility (Auto-injected) ===
+// Try to load .env file if it exists (for local runs)
+// Look for .env in current dir, parent dir, and grandparent dir
+try {
+  require('dotenv').config({ silent: true, path: '.env' }) || 
+  require('dotenv').config({ silent: true, path: '../.env' }) ||
+  require('dotenv').config({ silent: true, path: '../../.env' });
+} catch (e) {
+  // dotenv not available or .env doesn't exist - that's okay
+}
+
 async function wandbChat(userMessage, options = {}) {
   const fetch = require('node-fetch');
   
@@ -86,8 +96,9 @@ async function wandbChat(userMessage, options = {}) {
 /**
  * NPM dependencies required for the wandb utility
  * Using node-fetch@2 for CommonJS compatibility in Node.js v24
+ * Using dotenv for loading .env files when running locally
  */
-export const WANDB_NPM_DEPS = ['node-fetch@2'];
+export const WANDB_NPM_DEPS = ['node-fetch@2', 'dotenv'];
 
 /**
  * API documentation for teaching AI how to use the utility

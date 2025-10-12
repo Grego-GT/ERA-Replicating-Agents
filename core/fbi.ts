@@ -189,7 +189,10 @@ function analyzeExecutionOutput(response: CodeRunResponse): ExecutionResult {
       errorMessage = output;
     } else if (hasRuntimeError && parsedOutput?.error) {
       errorType = 'runtime';
-      errorMessage = parsedOutput.error;
+      // Ensure error is properly stringified (handle objects, Response, etc)
+      errorMessage = typeof parsedOutput.error === 'string' 
+        ? parsedOutput.error 
+        : JSON.stringify(parsedOutput.error, null, 2);
     }
   }
   
@@ -713,13 +716,17 @@ async function dispatchAgents(
         log(`Code execution failed: ${execution.errorType} error`, 'error', {
           errorType: execution.errorType,
           errorMessage: execution.errorMessage,
-          output: execution.output.substring(0, 500),
+          output: execution.output,
           iteration
         });
         
         // Also log the full error details to console for debugging
         if (execution.errorMessage) {
-          console.log(`\n📋 Full Error Details:\n${execution.errorMessage.substring(0, 1000)}\n`);
+          // Ensure errorMessage is properly stringified
+          const errorText = typeof execution.errorMessage === 'string'
+            ? execution.errorMessage
+            : JSON.stringify(execution.errorMessage, null, 2);
+          console.log(`\n📋 Full Error Details:\n${errorText}\n`);
         }
         
         sessionData.error = execution.errorMessage || `Execution failed: ${execution.errorType}`;
@@ -1088,10 +1095,10 @@ export async function testOrchestratorRefinement(): Promise<void> {
       }
       
       console.log('\n💻 Final Generated Code (preview):');
-      console.log(result.generation.code.substring(0, 300) + '...');
+      console.log(result.generation.code);
       
       console.log('\n📤 Final Execution Output:');
-      console.log(result.execution.output.substring(0, 500));
+      console.log(result.execution.output);
       
       if (result.execution.parsedOutput) {
         console.log('\n✨ Parsed Output:');

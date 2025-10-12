@@ -229,12 +229,12 @@ export async function prepareAgentFiles(
             const iterationHeader = `/**
  * Iteration ${attempt.attemptNumber} (Session ${session.sessionNumber}) - ${attempt.timestamp}
  * Agent: ${agentName}
- * Session Prompt: ${session.prompt.substring(0, 100)}${session.prompt.length > 100 ? '...' : ''}
+ * Session Prompt: ${session.prompt}
  * Extraction Success: ${attempt.extractionSuccess}
  * ${attempt.execution ? `Execution Success: ${attempt.execution.success}` : 'Not executed'}
  * 
  * Full Prompt:
- * ${attempt.prompt ? attempt.prompt.substring(0, 200) + '...' : session.prompt}
+ * ${attempt.prompt || session.prompt}
  */
 
 `;
