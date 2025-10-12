@@ -25,8 +25,8 @@ ERA doesn't just generate code—it **improves itself**. Every agent you create 
 - 🌐 **Web Server** - Hono-based server with Alpine.js frontend
 - ☁️ **Integrations** - Daytona sandbox, Wandb AI, and Weave tracing
 
-> **📢 Note**: Project structure organized as `core/` (orchestration), `utils/` (stdlib), `agents/` (generated)\
-> See [ARCHITECTURE.md](ARCHITECTURE.md) for system design, [WORKFLOWS.md](WORKFLOWS.md) for usage patterns.
+> **📢 Note**: This project generates its own code organized as `core/` (orchestration system), `utils/` (reusable utilities used by the app itself for code generation, AI interactions, and integrations), and `agents/` (experimental AI agents with specific tasks)\
+> See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for system design, [docs/WORKFLOWS.md](docs/WORKFLOWS.md) for usage patterns.
 
 ---
 
@@ -78,12 +78,15 @@ AgFactory/
 │       ├── index.ts         # Latest/best version
 │       ├── agent.json       # Full metadata & history
 │       └── iterations/      # Timestamped snapshots
+├── docs/                    # 📚 Documentation
+│   ├── ARCHITECTURE.md     # System design
+│   ├── WORKFLOWS.md        # Usage patterns
+│   ├── UTILITY-PROMOTION.md # Promotion system
+│   └── NPM-PACKAGES-GUIDE.md # Package usage
 ├── cli.ts                   # 💻 CLI Interface
 ├── main.ts                  # 🌐 Hono Web Server
 ├── history.ts               # 📝 Type Definitions
 ├── deno.json               # Deno configuration & tasks
-├── ARCHITECTURE.md         # 📚 Architecture documentation
-├── MIGRATION-GUIDE.md      # 🔄 Migration guide
 └── README.md
 ```
 
@@ -632,11 +635,11 @@ The project also supports:
 
 ## 📚 Documentation
 
-- **[WORKFLOWS.md](WORKFLOWS.md)** - Complete workflows: experimental agents, stable utilities, AI-powered promotion
-- **[ARCHITECTURE.md](ARCHITECTURE.md)** - System design: core/, utils/, agents/ separation and philosophy
-- **[CLI-IMPROVEMENTS.md](CLI-IMPROVEMENTS.md)** - Interactive type selection, smart defaults, promotion workflow
-- **[UTILITY-PROMOTION.md](UTILITY-PROMOTION.md)** - Deep dive into the promotion system and examples.ts generation
-- **[NPM-PACKAGES-GUIDE.md](NPM-PACKAGES-GUIDE.md)** - How generated agents can use npm packages in Daytona
+- **[docs/WORKFLOWS.md](docs/WORKFLOWS.md)** - Complete workflows: experimental agents, stable utilities, AI-powered promotion
+- **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** - System design: core/, utils/, agents/ separation and philosophy
+- **[docs/UTILITY-PROMOTION.md](docs/UTILITY-PROMOTION.md)** - Deep dive into the promotion system and examples.ts generation
+- **[docs/NPM-PACKAGES-GUIDE.md](docs/NPM-PACKAGES-GUIDE.md)** - How generated agents can use npm packages in Daytona
+- **[docs/README-UTILS-INJECTION.md](docs/README-UTILS-INJECTION.md)** - Utils injection system
 
 ### Quick Reference
 
