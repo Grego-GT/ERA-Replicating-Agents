@@ -1,7 +1,9 @@
 
 <img width="256" height="256" alt="era-logo" src="https://github.com/user-attachments/assets/ef2318fa-3f69-42ac-950b-c6765756cd51" />
 
-[![Watch the demo](https://img.youtube.com/vi/XFBR9owMNFQ/0.jpg)](Demo Video)
+[![Watch the demo](https://img.youtube.com/vi/XFBR9owMNFQ/0.jpg)](https://www.youtube.com/watch?v=XFBR9owMNFQ)
+
+
 
 # ERA 🚀
 
