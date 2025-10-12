@@ -8,11 +8,18 @@ WORKDIR /app
 COPY web ./web
 COPY cli.ts ./cli.ts
 COPY history.ts ./history.ts
-COPY backend ./backend
+COPY main.ts ./main.ts
 COPY deno.json ./deno.json
+
+# Copy core directories
+COPY core ./core
+COPY utils ./utils
 
 # Copy existing agents directory
 COPY agents ./agents
+
+# Create empty directories that might be needed
+RUN mkdir -p /app/daytona
 
 # Ensure agents directory exists with proper permissions
 RUN mkdir -p /app/agents && chmod -R 755 /app/agents
