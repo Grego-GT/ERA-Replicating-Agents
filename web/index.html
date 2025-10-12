@@ -226,6 +226,27 @@
         50% { opacity: 0.5; }
       }
 
+      .user-count {
+        position: absolute;
+        top: 20px;
+        right: 180px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background: rgba(80, 250, 123, 0.1);
+        padding: 8px 16px;
+        border-radius: 8px;
+        border: 1px solid #50fa7b;
+        z-index: 1000;
+        font-size: 13px;
+        color: #50fa7b;
+        font-weight: bold;
+      }
+
+      .user-count-icon {
+        font-size: 16px;
+      }
+
       #refresh-files {
         padding: 6px 12px;
         background: #2a2a2a;
@@ -309,6 +330,11 @@
           <input type="text" id="user-input" autofocus autocomplete="off" spellcheck="false" />
         </div>
 
+        <div class="user-count">
+          <span class="user-count-icon">👥</span>
+          <span id="user-count-text">0 online</span>
+        </div>
+
         <div class="status-indicator">
           <div class="status-dot" id="status-dot"></div>
           <span id="status-text">Connecting...</span>
@@ -332,6 +358,7 @@
       const currentPathEl = document.getElementById('current-path');
       const refreshBtn = document.getElementById('refresh-files');
       const copyIndicator = document.getElementById('copy-indicator');
+      const userCountText = document.getElementById('user-count-text');
       
       let ws = null;
       let currentPath = '..';
@@ -585,6 +612,12 @@
               writeLine(`❌ Error: ${message.message}`, '#ff5555');
             } else if (message.type === 'connected') {
               console.log('✅ Server confirmed connection');
+            } else if (message.type === 'user_count') {
+              // Update user count display
+              const count = message.count;
+              const plural = count === 1 ? 'user' : 'users';
+              userCountText.textContent = `${count} ${plural} online`;
+              console.log(`👥 ${count} ${plural} online`);
             }
           } catch (error) {
             console.error('Error parsing message:', error);

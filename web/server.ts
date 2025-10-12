@@ -9,6 +9,25 @@ import * as esbuild from "esbuild";
 const port = parseInt(Deno.env.get("PORT") || "3000");
 const isProduction = Deno.env.get("DENO_ENV") === "production" || Deno.env.get("FLY_APP_NAME");
 
+// Track active WebSocket connections
+const activeConnections = new Set<WebSocket>();
+
+// Broadcast user count to all connected clients
+function broadcastUserCount() {
+  const count = activeConnections.size;
+  const message = JSON.stringify({ type: 'user_count', count });
+  
+  activeConnections.forEach((socket) => {
+    if (socket.readyState === WebSocket.OPEN) {
+      try {
+        socket.send(message);
+      } catch (error) {
+        console.error('Error broadcasting user count:', error);
+      }
+    }
+  });
+}
+
 const MIME_TYPES: Record<string, string> = {
   ".html": "text/html",
   ".js": "application/javascript",
@@ -78,6 +97,10 @@ async function serveFile(filePath: string): Promise<Response> {
 // Handle WebSocket connections for terminal
 function handleWebSocket(socket: WebSocket) {
   console.log("🔌 WebSocket connected");
+  
+  // Add to active connections
+  activeConnections.add(socket);
+  broadcastUserCount();
   
   let currentProcess: Deno.ChildProcess | null = null;
   let processWriter: WritableStreamDefaultWriter<Uint8Array> | null = null;
@@ -308,6 +331,11 @@ function handleWebSocket(socket: WebSocket) {
 
   socket.onclose = () => {
     console.log("🔌 WebSocket disconnected");
+    
+    // Remove from active connections
+    activeConnections.delete(socket);
+    broadcastUserCount();
+    
     // Clean up process if still running
     if (currentProcess) {
       try {
