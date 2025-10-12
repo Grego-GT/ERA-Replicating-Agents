@@ -671,6 +671,8 @@
       let heartbeatInterval = null;
       let reconnectAttempts = 0;
       const MAX_RECONNECT_ATTEMPTS = 5;
+      let connectionStableTimeout = null;
+      let isConnecting = false;
 
       // ANSI color map
       const ansiColors = {
@@ -870,6 +872,12 @@
 
       // WebSocket Connection
       function connectWebSocket() {
+        if (isConnecting) {
+          console.log('⚠️ Already connecting, skipping...');
+          return;
+        }
+
+        isConnecting = true;
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const wsUrl = `${protocol}//${window.location.host}/ws`;
         
@@ -882,12 +890,24 @@
           heartbeatInterval = null;
         }
 
+        // Clear connection stability timeout
+        if (connectionStableTimeout) {
+          clearTimeout(connectionStableTimeout);
+          connectionStableTimeout = null;
+        }
+
         ws = new WebSocket(wsUrl);
 
         ws.onopen = () => {
           console.log('✅ WebSocket connected');
           setStatus('connected');
-          reconnectAttempts = 0; // Reset reconnect counter
+          isConnecting = false;
+          
+          // Mark connection as stable after 5 seconds
+          connectionStableTimeout = setTimeout(() => {
+            reconnectAttempts = 0; // Reset reconnect counter only after stable
+            console.log('✅ Connection stable');
+          }, 5000);
           
           writeHTML('<span style="color: #50fa7b;">╔════════════════════════════════════════════════════════════════╗</span>');
           writeHTML('<span style="color: #50fa7b;">║              🏭  ERA Web Terminal                              ║</span>');
@@ -901,13 +921,27 @@
           // Start heartbeat to keep connection alive
           heartbeatInterval = setInterval(() => {
             if (ws && ws.readyState === WebSocket.OPEN) {
-              ws.send(JSON.stringify({ type: 'ping' }));
-              console.log('💓 Heartbeat sent');
+              try {
+                ws.send(JSON.stringify({ type: 'ping' }));
+                console.log('💓 Heartbeat sent');
+              } catch (error) {
+                console.error('❌ Heartbeat failed:', error);
+                clearInterval(heartbeatInterval);
+                heartbeatInterval = null;
+              }
+            } else {
+              console.warn('⚠️ WebSocket not open, clearing heartbeat');
+              clearInterval(heartbeatInterval);
+              heartbeatInterval = null;
             }
-          }, 15000); // Every 15 seconds (Fly.io timeout is ~20s)
+          }, 10000); // Every 10 seconds (Fly.io timeout is ~20s)
 
-          // Start the CLI
-          ws.send(JSON.stringify({ type: 'start_cli' }));
+          // Start the CLI after a small delay to ensure connection is established
+          setTimeout(() => {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+              ws.send(JSON.stringify({ type: 'start_cli' }));
+            }
+          }, 100);
         };
 
         ws.onmessage = (event) => {
@@ -964,12 +998,20 @@
 
         ws.onerror = (error) => {
           console.error('❌ WebSocket error:', error);
+          console.log('Error details - readyState:', ws?.readyState, 'time:', new Date().toISOString());
           setStatus('disconnected');
+          isConnecting = false;
         };
 
         ws.onclose = (event) => {
-          console.log('🔌 WebSocket closed, code:', event.code, 'reason:', event.reason);
+          console.log('🔌 WebSocket closed');
+          console.log('   Code:', event.code);
+          console.log('   Reason:', event.reason || 'No reason provided');
+          console.log('   Clean:', event.wasClean);
+          console.log('   Time:', new Date().toISOString());
+          console.log('   Reconnect attempts:', reconnectAttempts);
           setStatus('disconnected');
+          isConnecting = false;
           
           // Clear heartbeat
           if (heartbeatInterval) {
@@ -977,8 +1019,31 @@
             heartbeatInterval = null;
           }
 
-          // Attempt auto-reconnect if not a normal closure and haven't exceeded max attempts
-          if (event.code !== 1000 && reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+          // Clear connection stability timeout
+          if (connectionStableTimeout) {
+            clearTimeout(connectionStableTimeout);
+            connectionStableTimeout = null;
+          }
+
+          // Don't auto-reconnect if:
+          // 1. Normal closure (code 1000)
+          // 2. Max attempts exceeded
+          // 3. Connection wasn't stable (closed within 5 seconds)
+          const wasUnstable = reconnectAttempts > 0 && event.code !== 1000;
+          
+          if (event.code === 1000) {
+            // Normal closure - don't reconnect
+            writeLine('');
+            writeLine('⚠️  Connection closed normally', '#f1fa8c');
+            writeLine('💡 Refresh to reconnect', '#8be9fd');
+          } else if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+            // Max attempts exceeded
+            writeLine('');
+            writeLine('❌ Connection lost after multiple attempts', '#ff5555');
+            writeLine('💡 Please refresh the page to reconnect', '#8be9fd');
+            reconnectAttempts = 0; // Reset for next manual reconnect
+          } else {
+            // Attempt reconnect
             reconnectAttempts++;
             const delay = Math.min(1000 * Math.pow(2, reconnectAttempts - 1), 30000); // Exponential backoff, max 30s
             
@@ -986,19 +1051,11 @@
             writeLine(`⚠️  Connection lost (attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`, '#f1fa8c');
             writeLine(`💡 Reconnecting in ${Math.round(delay/1000)}s...`, '#8be9fd');
             
-            console.log(`🔄 Reconnecting in ${delay}ms...`);
+            console.log(`🔄 Reconnecting in ${delay}ms... (attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`);
             setTimeout(() => {
               console.log('🔄 Attempting reconnect...');
               connectWebSocket();
             }, delay);
-          } else if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-            writeLine('');
-            writeLine('❌ Connection lost after multiple attempts', '#ff5555');
-            writeLine('💡 Please refresh the page to reconnect', '#8be9fd');
-          } else {
-            writeLine('');
-            writeLine('⚠️  Connection closed', '#f1fa8c');
-            writeLine('💡 Refresh to reconnect', '#8be9fd');
           }
         };
       }

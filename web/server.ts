@@ -47,9 +47,9 @@ function broadcastUserCount() {
 // Periodic heartbeat to keep user count updated and clean up stale connections
 setInterval(() => {
   broadcastUserCount();
-}, 15000); // Every 15 seconds (Fly.io WebSocket timeout is ~20s)
+}, 10000); // Every 10 seconds (Fly.io WebSocket timeout is ~20s)
 
-console.log("⏰ User count heartbeat started (15s interval)");
+console.log("⏰ User count heartbeat started (10s interval)");
 
 const MIME_TYPES: Record<string, string> = {
   ".html": "text/html",
@@ -309,44 +309,77 @@ function handleWebSocket(socket: WebSocket) {
           }
         }
 
-        const command = new Deno.Command("deno", {
-          args: commandArgs,
-          stdin: "piped",
-          stdout: "piped",
-          stderr: "piped",
-          cwd: sessionCwd,  // Use session's current directory
-        });
+        try {
+          const command = new Deno.Command("deno", {
+            args: commandArgs,
+            stdin: "piped",
+            stdout: "piped",
+            stderr: "piped",
+            cwd: sessionCwd,  // Use session's current directory
+          });
 
-        currentProcess = command.spawn();
-        processWriter = currentProcess.stdin.getWriter();
+          currentProcess = command.spawn();
+          processWriter = currentProcess.stdin.getWriter();
 
-        // Stream stdout
-        (async () => {
-          const decoder = new TextDecoder();
-          for await (const chunk of currentProcess!.stdout) {
-            const text = decoder.decode(chunk);
-            socket.send(JSON.stringify({ type: 'output', data: text }));
-          }
-        })();
+          // Stream stdout
+          (async () => {
+            try {
+              const decoder = new TextDecoder();
+              for await (const chunk of currentProcess!.stdout) {
+                const text = decoder.decode(chunk);
+                if (socket.readyState === WebSocket.OPEN) {
+                  socket.send(JSON.stringify({ type: 'output', data: text }));
+                }
+              }
+            } catch (error) {
+              console.error('Error streaming stdout:', error);
+            }
+          })();
 
-        // Stream stderr
-        (async () => {
-          const decoder = new TextDecoder();
-          for await (const chunk of currentProcess!.stderr) {
-            const text = decoder.decode(chunk);
-            socket.send(JSON.stringify({ type: 'output', data: text }));
-          }
-        })();
+          // Stream stderr
+          (async () => {
+            try {
+              const decoder = new TextDecoder();
+              for await (const chunk of currentProcess!.stderr) {
+                const text = decoder.decode(chunk);
+                if (socket.readyState === WebSocket.OPEN) {
+                  socket.send(JSON.stringify({ type: 'output', data: text }));
+                }
+              }
+            } catch (error) {
+              console.error('Error streaming stderr:', error);
+            }
+          })();
 
-        // Handle process exit - Keep socket alive!
-        currentProcess.status.then((status) => {
+          // Handle process exit - Keep socket alive!
+          currentProcess.status.then((status) => {
+            if (socket.readyState === WebSocket.OPEN) {
+              socket.send(JSON.stringify({ 
+                type: 'process_exit', 
+                code: status.code 
+              }));
+            }
+            currentProcess = null;
+            processWriter = null;
+          }).catch((error) => {
+            console.error('Process status error:', error);
+            if (socket.readyState === WebSocket.OPEN) {
+              socket.send(JSON.stringify({ 
+                type: 'error', 
+                message: 'Process crashed: ' + error.message 
+              }));
+            }
+            currentProcess = null;
+            processWriter = null;
+          });
+        } catch (error) {
+          console.error('Error spawning process:', error);
           socket.send(JSON.stringify({ 
-            type: 'process_exit', 
-            code: status.code 
+            type: 'error', 
+            message: 'Failed to start process: ' + error.message 
           }));
-          currentProcess = null;
-          processWriter = null;
-        });
+          socket.send(JSON.stringify({ type: 'process_exit', code: 1 }));
+        }
 
       } else if (data.type === 'input') {
         // Send input to the running process

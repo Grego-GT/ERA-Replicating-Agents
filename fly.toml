@@ -32,6 +32,10 @@ primary_region = 'sjc'
     hard_limit = 250
     soft_limit = 200
 
+  # Increase idle timeout for WebSocket connections
+  [http_service.http_options]
+    idle_timeout = "60s"
+
 [[vm]]
   cpu_kind = 'shared'
   cpus = 1
