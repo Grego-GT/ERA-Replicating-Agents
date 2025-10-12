@@ -15,17 +15,19 @@ COPY deno.json ./deno.json
 COPY core ./core
 COPY utils ./utils
 
-# Copy existing agents directory
-COPY agents ./agents
+# Copy demo agents (will be used to populate volume on first run)
+COPY demo_agents ./demo_agents
 
 # Create empty directories that might be needed
 RUN mkdir -p /app/daytona
-
-# Ensure agents directory exists with proper permissions
-RUN mkdir -p /app/agents && chmod -R 755 /app/agents
+RUN mkdir -p /app/agents
 
 # Set working directory to web
 WORKDIR /app/web
+
+# Copy and make entrypoint script executable
+COPY web/entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
 
 # Cache dependencies
 RUN deno cache server.ts ../cli.ts
@@ -33,6 +35,6 @@ RUN deno cache server.ts ../cli.ts
 # Expose port
 EXPOSE 8080
 
-# Run the server with all necessary permissions
-CMD ["deno", "run", "--allow-net", "--allow-read", "--allow-write", "--allow-env", "--allow-sys", "--allow-run", "server.ts"]
+# Use entrypoint script
+ENTRYPOINT ["/app/entrypoint.sh"]
 

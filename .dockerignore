@@ -16,8 +16,11 @@ web/deno.lock
 dist
 web/dist
 
-# Agents - uncomment to exclude (keeping agents for demos)
-# agents/*
+# Exclude working agents directory (will be populated from demo_agents)
+agents/*
+
+# Include demo_agents (read-only templates)
+!demo_agents
 
 # OS files
 .DS_Store
