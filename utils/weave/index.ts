@@ -37,21 +37,40 @@ const DEFAULT_PROJECT = 'era';
  * Automatically prevents multiple initializations
  *
  * @param projectName - Your Wandb project name (default: "era")
+ * @param silent - If true, suppress console output (default: false)
  * @returns Promise that resolves when initialization is complete
  */
-export async function init(projectName: string = DEFAULT_PROJECT): Promise<void> {
+export async function init(projectName: string = DEFAULT_PROJECT, silent: boolean = false): Promise<void> {
   if (isInitialized) {
-    console.log(`⚠️ Weave already initialized for project: ${projectName}`);
+    if (!silent) {
+      console.log(`⚠️ Weave already initialized for project: ${projectName}`);
+    }
     return;
   }
 
   try {
+    // Temporarily suppress console.log from weaveLib.init
+    const originalLog = console.log;
+    if (silent) {
+      console.log = () => {}; // Suppress logs
+    }
+    
     await weaveLib.init(projectName);
+    
+    // Restore console.log
+    if (silent) {
+      console.log = originalLog;
+    }
+    
     isInitialized = true;
-    console.log(`✅ Weave initialized for project: ${projectName}`);
+    if (!silent) {
+      console.log(`✅ Weave initialized for project: ${projectName}`);
+    }
   } catch (error) {
     const err = error as Error;
-    console.error('❌ Failed to initialize Weave:', err);
+    if (!silent) {
+      console.error('❌ Failed to initialize Weave:', err);
+    }
     throw error;
   }
 }

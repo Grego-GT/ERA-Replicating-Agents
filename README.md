@@ -5,8 +5,12 @@
 A comprehensive Deno-native project featuring:
 
 - 🤖 **CLI Tool** - Create and manage AI agents with custom prompts
+- 🧠 **FBI System** - AI-powered agent orchestration with prompt improvement
 - 🌐 **Web Server** - Hono-based server with Alpine.js frontend
-- ☁️ **Backend Integrations** - Daytona, Wandb, and Weave modules
+- ☁️ **Integrations** - Daytona sandbox, Wandb AI, and Weave tracing
+
+> **📢 Note**: Project structure organized as `core/` (orchestration) & `utils/` (helpers)  
+> See [ARCHITECTURE.md](ARCHITECTURE.md) for complete documentation.
 
 ---
 
@@ -39,21 +43,27 @@ cd ERA
 ## 📦 Project Structure
 
 ```
-ERA/
-├── cli.ts                   # CLI tool for creating agents
-├── core/
-│   ├── main.js              # Hono web server (main app)
-│   ├── frontend/
-│   │   └── index.html       # Alpine.js frontend
-│   ├── backend/
-│   │   ├── index.js         # Backend module exports
-│   │   ├── daytona.js       # Daytona sandbox integration
-│   │   ├── wandb.js         # Wandb Inference API
-│   │   └── weave.js         # Weave tracing
-│   ├── styles.js            # Tailwind config
-│   └── inspiration.js       # Inspiration module
-├── agents/                  # Generated agents (gitignored)
-├── deno.json                # Deno configuration
+AgFactory/
+├── core/                    # 🧠 Core FBI Orchestration System
+│   ├── fbi.ts              # Main orchestrator
+│   ├── director.ts         # AI decision maker & prompt improvement
+│   ├── prep.ts             # File preparation
+│   └── test-prep-integration.ts
+├── utils/                   # 🔧 Utility Functions
+│   ├── codegen/            # AI code generation
+│   ├── daytona/            # Sandbox execution
+│   ├── wandb/              # AI API wrapper
+│   └── weave/              # Tracing
+├── tests/                   # 🧪 Test Files
+├── frontend/                # 🎨 UI Assets
+│   └── index.html          # Alpine.js frontend
+├── agents/                  # 🤖 Generated Agents
+├── cli.ts                   # 💻 CLI Interface
+├── main.ts                  # 🌐 Hono Web Server
+├── history.ts               # 📝 Type Definitions
+├── deno.json               # Deno configuration & tasks
+├── ARCHITECTURE.md         # 📚 Architecture documentation
+├── MIGRATION-GUIDE.md      # 🔄 Migration guide
 └── README.md
 ```
 

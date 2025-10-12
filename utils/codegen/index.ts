@@ -6,9 +6,9 @@
  */
 
 import "jsr:@std/dotenv/load"; // needed for deno run; not req for smallweb or valtown
-import { runCode } from './daytona.ts';
-import { chat } from './wandb.ts';
-import * as weave from './weave.ts';
+import { runCode } from '../daytona/index.ts';
+import { chat } from '../wandb/index.ts';
+import * as weave from '../weave/index.ts';
 
 // ============================================================================
 // Type Definitions
@@ -305,7 +305,7 @@ Generate clean, TypeScript-compliant code that will execute without errors.`;
 }
 
 // NOTE: generateAndExecute and testCodeGen have been removed
-// Use FBI orchestrator instead: import { orchestrate } from './backend/fbi.ts'
+// Use FBI orchestrator instead: import { orchestrate } from '../core/fbi.ts'
 // Run tests with: deno task test
 
 

@@ -241,8 +241,3 @@ export async function runDaytonaTest(): Promise<void> {
   }
 }
 
-// If run directly, execute the test
-if (import.meta.main) {
-  runDaytonaTest();
-}
-

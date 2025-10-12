@@ -60,6 +60,8 @@ export interface AgentCreationHistory {
   versionID: string;
   /** Agent name */
   agentName: string;
+  /** AI-generated description of what this agent does */
+  agentDescription?: string;
   /** User's original prompt */
   ogprompt: string;
   /** When the run started (ISO string) */

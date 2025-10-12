@@ -8,9 +8,9 @@
  * Run: deno run --allow-net --allow-env test-weave-integration.ts
  */
 
-import * as weave from './weave.ts';
-import { chat, simpleChat, chatWithHistory } from './wandb.ts';
-import type { ChatMessage } from './wandb.ts';
+import * as weave from '../utils/weave/index.ts';
+import { chat, simpleChat, chatWithHistory } from '../utils/wandb/index.ts';
+import type { ChatMessage } from '../utils/wandb/index.ts';
 
 console.log('🧪 Testing Weave Integration with Wandb Inference\n');
 

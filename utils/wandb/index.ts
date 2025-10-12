@@ -13,7 +13,7 @@
 
 import "jsr:@std/dotenv/load"; // needed for deno run; not req for smallweb or valtown
 import { Sema } from "npm:async-sema";
-import * as weave from "./weave.ts";
+import * as weave from "../weave/index.ts";
 
 // Semaphore: Allow 10 concurrent requests at a time to avoid 503 errors
 const sema = new Sema(10);
@@ -419,10 +419,5 @@ export async function runWandbTest(): Promise<void> {
     console.error('❌ Wandb test failed:', err);
     throw error;
   }
-}
-
-// If run directly, execute the test
-if (import.meta.main) {
-  runWandbTest();
 }
 

@@ -14,10 +14,10 @@
  */
 
 import "jsr:@std/dotenv/load"; // needed for deno run; not req for smallweb or valtown
-import { generateCode } from './codegen.ts';
-import { runCode, type CodeRunResponse } from './daytona.ts';
-import * as weave from './weave.ts';
-import { improvePromptWithAI, getDirectorVerdict, type PromptImprovementResult, type DirectorVerdict } from './director.ts';
+import { generateCode } from '../utils/codegen/index.ts';
+import { runCode, type CodeRunResponse } from '../utils/daytona/index.ts';
+import * as weave from '../utils/weave/index.ts';
+import { improvePromptWithAI, getDirectorVerdict, generateAgentDescription, type PromptImprovementResult, type DirectorVerdict } from './director.ts';
 import type { AgentCreationHistory, GenerationAttempt, ExecutionResult as SessionExecutionResult, AgentFiles } from '../history.ts';
 
 // ============================================================================
@@ -353,13 +353,14 @@ async function dispatchAgents(
     versionID,
     agentName,
     ogprompt: userPrompt,
+    timestamp: new Date().toISOString(),
     attempts: [],
     systemPrompt,
     judgingCriteria,
     wasExecuted: false,
     files: {
       indexFile: `agents/${agentName}/index.ts`,
-      metadataFile: `agents/${agentName}/generation-metadata.json`
+      metadataFile: `agents/${agentName}/agent.json`
     },
     finalCode: ''
   };
@@ -641,7 +642,24 @@ async function dispatchAgents(
       continue;
     } // End of iteration loop
     
-    // Step 3: Complete
+    // Step 3: Generate Agent Description
+    log('Generating agent description...', 'info');
+    const descriptionResult = await generateAgentDescription(
+      agentName,
+      userPrompt,
+      sessionData.finalCode
+    );
+    
+    if (descriptionResult.success) {
+      sessionData.agentDescription = descriptionResult.description;
+      log(`Agent description: "${descriptionResult.description}"`, 'success');
+    } else {
+      // Still save the fallback description
+      sessionData.agentDescription = descriptionResult.description;
+      log('Using fallback description', 'warning', { error: descriptionResult.error });
+    }
+    
+    // Step 4: Complete
     const totalDuration = Date.now() - startTime;
     
     // Use the last attempt's results
@@ -658,7 +676,8 @@ async function dispatchAgents(
         duration: totalDuration,
         versionID: sessionData.versionID,
         totalAttempts: sessionData.attempts?.length || 0,
-        wasExecuted: sessionData.wasExecuted
+        wasExecuted: sessionData.wasExecuted,
+        hasDescription: !!sessionData.agentDescription
       }
     );
     
