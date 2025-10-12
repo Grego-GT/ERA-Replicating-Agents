@@ -1,0 +1,28 @@
+# Use official Deno image
+FROM denoland/deno:1.45.5
+
+# Set working directory
+WORKDIR /app
+
+# Copy all necessary files
+COPY web ./web
+COPY cli.ts ./cli.ts
+COPY history.ts ./history.ts
+COPY backend ./backend
+COPY deno.json ./deno.json
+
+# Set working directory to web
+WORKDIR /app/web
+
+# Cache dependencies
+RUN deno cache server.ts ../cli.ts
+
+# Create agents directory
+RUN mkdir -p /app/agents
+
+# Expose port
+EXPOSE 8080
+
+# Run the server with all necessary permissions
+CMD ["deno", "run", "--allow-net", "--allow-read", "--allow-write", "--allow-env", "--allow-sys", "--allow-run", "server.ts"]
+

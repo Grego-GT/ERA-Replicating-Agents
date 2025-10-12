@@ -1,0 +1,27 @@
+{
+  "tasks": {
+    "dev": "deno run --allow-net --allow-read --allow-env --allow-run --allow-sys --watch server.ts",
+    "build": "deno task build:bundle && deno task build:css",
+    "build:bundle": "deno run --allow-read --allow-write --allow-env --allow-net build.ts",
+    "build:css": "echo 'CSS bundling handled in build step'",
+    "preview": "deno run --allow-net --allow-read --allow-env --allow-run --allow-sys server.ts --production"
+  },
+  "imports": {
+    "react": "npm:react@^18.2.0",
+    "react-dom": "npm:react-dom@^18.2.0",
+    "react-dom/client": "npm:react-dom@^18.2.0/client",
+    "@xterm/xterm": "npm:@xterm/xterm@^5.3.0",
+    "@xterm/addon-fit": "npm:@xterm/addon-fit@^0.10.0",
+    "@xterm/addon-web-links": "npm:@xterm/addon-web-links@^0.11.0",
+    "@std/path": "jsr:@std/path",
+    "@std/fs": "jsr:@std/fs",
+    "esbuild": "npm:esbuild@^0.19.0"
+  },
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "jsxImportSource": "react",
+    "lib": ["ESNext", "DOM", "DOM.Iterable"]
+  },
+  "nodeModulesDir": false
+}
+
