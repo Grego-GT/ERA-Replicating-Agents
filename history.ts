@@ -4,7 +4,6 @@
  * Type definitions and utilities for tracking agent creation runs.
  * This module captures comprehensive metadata for each agent creation loop.
  */
-
 // ============================================================================
 // Core Types
 // ============================================================================
@@ -31,7 +30,6 @@ export interface GenerationAttempt {
   /** Execution results from daytona */
   execution?: ExecutionResult;
 }
-
 /**
  * Code execution result from Daytona sandbox
  */
@@ -58,10 +56,6 @@ export interface AgentFiles {
  * Comprehensive metadata for a single agent creation run
  */
 export interface AgentCreationHistory {
-  // ========================================
-  // Basic Information
-  // ========================================
-  
   /** Unique identifier for this run */
   versionID: string;
   /** Agent name */
@@ -69,6 +63,7 @@ export interface AgentCreationHistory {
   /** User's original prompt */
   ogprompt: string;
   /** When the run started (ISO string) */
+  timestamp: string;
   // ========================================
   // AI Generation Details (if applicable)
   // ========================================
@@ -87,16 +82,134 @@ export interface AgentCreationHistory {
   files: AgentFiles;
   /** Final code that was saved */
   finalCode: string;
-// ========================================
+  // ========================================
+  // Error Handling
+  // ========================================
   /** Error message if run failed */
   error?: string;
   /** Stack trace if available */
   stackTrace?: string;
-  // ========================================
-  // Logging & Tracing
-  // ========================================
-  /** Weave trace ID (if applicable) */
-  weaveTraceId?: string;
-  /** Wandb project name (if applicable) */
-  wandbProject?: string;
+}
+
+// ============================================================================
+// Utility Functions
+// ============================================================================
+
+/**
+ * Generate a unique version ID
+ */
+export function generateVersionId(): string {
+  return `v1_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+}
+
+/**
+ * Create a new history entry for the first run
+ */
+export function createHistoryEntry(
+  agentName: string,
+  prompt: string,
+  systemPrompt?: string,
+  judgingCriteria?: string
+): AgentCreationHistory {
+  return {
+    versionID: generateVersionId(),
+    agentName,
+    ogprompt: prompt,
+    timestamp: new Date().toISOString(),
+    systemPrompt,
+    judgingCriteria,
+    attempts: [],
+    wasExecuted: false,
+    files: {
+      indexFile: `agents/${agentName}/index.ts`,
+      metadataFile: `agents/${agentName}/history.json`,
+    },
+    finalCode: "",
+  };
+}
+
+/**
+ * Add a generation attempt to history
+ */
+export function addAttempt(
+  history: AgentCreationHistory,
+  attempt: GenerationAttempt
+): void {
+  if (!history.attempts) {
+    history.attempts = [];
+  }
+  history.attempts.push(attempt);
+}
+
+/**
+ * Update the final code in history
+ */
+export function updateFinalCode(
+  history: AgentCreationHistory,
+  code: string
+): void {
+  history.finalCode = code;
+}
+
+/**
+ * Mark execution as complete
+ */
+export function markExecuted(
+  history: AgentCreationHistory,
+  wasSuccessful: boolean
+): void {
+  history.wasExecuted = wasSuccessful;
+}
+
+/**
+ * Add error information to history
+ */
+export function addError(
+  history: AgentCreationHistory,
+  error: Error | string
+): void {
+  history.error = typeof error === "string" ? error : error.message;
+  if (error instanceof Error && error.stack) {
+    history.stackTrace = error.stack;
+  }
+}
+
+/**
+ * Convert history to JSON for storage
+ */
+export function toJSON(history: AgentCreationHistory): string {
+  return JSON.stringify(history, null, 2);
+}
+
+/**
+ * Load history from JSON
+ */
+export function fromJSON(json: string): AgentCreationHistory {
+  return JSON.parse(json) as AgentCreationHistory;
+}
+
+/**
+ * Save history to a file
+ */
+export async function saveHistory(
+  history: AgentCreationHistory,
+  filePath: string
+): Promise<void> {
+  const json = toJSON(history);
+  // Note: This function expects Deno environment
+  // @ts-ignore - Deno global
+  await Deno.writeTextFile(filePath, json);
+}
+
+/**
+ * Load history from a file
+ */
+export async function loadHistory(filePath: string): Promise<AgentCreationHistory | null> {
+  try {
+    // @ts-ignore - Deno global
+    const json = await Deno.readTextFile(filePath);
+    return fromJSON(json);
+  } catch {
+    return null;
+  }
 }
