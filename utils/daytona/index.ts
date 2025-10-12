@@ -42,6 +42,7 @@ export interface CodeRunResponse {
  */
 interface CreateSandboxOptions {
   language?: string;
+  envVars?: Record<string, string>;
 }
 
 /**
@@ -95,14 +96,24 @@ export function initDaytona(): Daytona {
  * 
  * @param code - The JavaScript/TypeScript code to run
  * @param language - The language (default: 'typescript')
+ * @param envVars - Optional environment variables to pass to the sandbox
  * @returns The execution result with stdout/stderr
  */
-export async function runCode(code: string, language: string = 'typescript'): Promise<CodeRunResponse> {
+export async function runCode(
+  code: string, 
+  language: string = 'typescript',
+  envVars?: Record<string, string>
+): Promise<CodeRunResponse> {
   try {
     const daytona = initDaytona();
     
-    // Create a sandbox
-    const sandbox = await daytona.create({ language }) as unknown as DaytonaSandbox;
+    // Create a sandbox with optional env vars
+    const options: CreateSandboxOptions = { language };
+    if (envVars) {
+      options.envVars = envVars;
+    }
+    
+    const sandbox = await daytona.create(options) as unknown as DaytonaSandbox;
     console.log(`✅ Sandbox created: ${sandbox.id}`);
     
     // Run the code

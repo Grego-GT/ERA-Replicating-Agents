@@ -29,7 +29,8 @@
     "test:fbi:refinement": "deno run --allow-net --allow-read --allow-env --allow-sys core/fbi.ts refinement",
     "test:prep": "deno run --allow-net --allow-read --allow-write --allow-env --allow-sys tests/test-prep-integration.ts",
     "test": "deno run --allow-net --allow-read --allow-env --allow-sys core/fbi.ts",
-    "test:weave": "deno run --allow-net --allow-read --allow-env --allow-sys tests/test-weave-integration.ts"
+    "test:weave": "deno run --allow-net --allow-read --allow-env --allow-sys tests/test-weave-integration.ts",
+    "demo:daytona": "deno run --allow-net --allow-read --allow-env --allow-sys tests/daytona/demo.ts"
   },
   "$schema": "https://raw.githubusercontent.com/denoland/deno/348900b8b79f4a434cab4c74b3bc8d4d2fa8ee74/cli/schemas/config-file.v1.json",
   "lock": false,
