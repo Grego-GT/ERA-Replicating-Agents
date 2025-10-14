@@ -100,8 +100,7 @@ ERA/
 ---
 
 ## Agent Creation Process (How it works)
-
-<img width="2100" height="1280" alt="Untitled diagram-2025-10-12-181340" src="https://github.com/user-attachments/assets/77f37851-5a86-4386-9577-b395cb3a2265" />
+<img width="2100" height="1280" alt="Untitled diagram-2025-10-14-044616" src="https://github.com/user-attachments/assets/345eaaa7-7043-44d1-9a8e-f749d11d23ac" />
 
 ## 🔧 Usage
 
