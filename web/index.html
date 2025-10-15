@@ -168,6 +168,9 @@
       .folder-item {
         color: #8be9fd;
         font-weight: 500;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
       }
 
       .file-item {
@@ -176,6 +179,34 @@
 
       .file-icon, .folder-icon {
         flex-shrink: 0;
+      }
+
+      .download-btn {
+        background: #444;
+        border: 1px solid #666;
+        color: #f0f0f0;
+        padding: 4px 8px;
+        border-radius: 3px;
+        font-size: 12px;
+        cursor: pointer;
+        margin-left: 8px;
+        transition: all 0.2s;
+        opacity: 0;
+      }
+
+      .download-btn:hover {
+        background: #555;
+        border-color: #777;
+      }
+
+      .folder-item:hover .download-btn {
+        opacity: 1;
+      }
+
+      .folder-content {
+        display: flex;
+        align-items: center;
+        flex: 1;
       }
 
       #main-content {
@@ -816,7 +847,20 @@
           
           if (entry.isDirectory) {
             item.className = 'folder-item';
-            item.innerHTML = `<span class="folder-icon">${icon}</span><span>${entry.name}/</span>`;
+            
+            // Check if we're in the agents folder to show download button
+            // Only show download button for folders within agents/, not agents/ itself
+            const isWithinAgentsFolder = currentRelativePath.startsWith('agents/') && 
+                                        entry.name !== 'agents';
+            const isDirectAgentSubfolder = currentRelativePath === 'agents' && 
+                                          entry.name !== 'agents';
+            
+            let downloadButton = '';
+            if (isWithinAgentsFolder || isDirectAgentSubfolder) {
+              downloadButton = `<button class="download-btn" onclick="event.stopPropagation(); downloadAgentFolder('${entry.path}')" title="Download agent folder">📥</button>`;
+            }
+            
+            item.innerHTML = `<div class="folder-content"><span class="folder-icon">${icon}</span><span>${entry.name}/</span></div>${downloadButton}`;
             item.onclick = () => loadFiles(entry.path);
           } else {
             item.className = 'file-item';
@@ -867,6 +911,41 @@
           })
           .catch(error => {
             writeLine(`Error loading file: ${error.message}`, '#ff5555');
+          });
+      }
+
+      function downloadAgentFolder(folderPath) {
+        writeLine('', '#888');
+        writeLine(`📥 Downloading agent folder: ${folderPath}`, '#8be9fd');
+        writeLine('─'.repeat(60), '#444');
+        
+        fetch(`/api/download-folder?path=${encodeURIComponent(folderPath)}`)
+          .then(res => {
+            if (!res.ok) {
+              throw new Error(`HTTP error! status: ${res.status}`);
+            }
+            return res.blob();
+          })
+          .then(blob => {
+            // Create download link
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = `${folderPath.split('/').pop()}.zip`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+            
+            writeLine(`✅ Successfully downloaded ${folderPath}`, '#50fa7b');
+            writeLine('─'.repeat(60), '#444');
+            writeLine('');
+          })
+          .catch(error => {
+            writeLine(`Error downloading folder: ${error.message}`, '#ff5555');
+            writeLine('─'.repeat(60), '#444');
+            writeLine('');
           });
       }
 
@@ -1250,12 +1329,14 @@
       });
 
       agUiClose.addEventListener('click', () => {
+        restoreOriginalHandler();
         agUiModal.style.display = 'none';
       });
 
       // Close on outside click
       agUiModal.addEventListener('click', (e) => {
         if (e.target === agUiModal) {
+          restoreOriginalHandler();
           agUiModal.style.display = 'none';
         }
       });
@@ -1263,15 +1344,28 @@
       // Close on Escape key
       document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape' && agUiModal.style.display === 'block') {
+          restoreOriginalHandler();
           agUiModal.style.display = 'none';
         }
       });
 
       let currentAgentExecution = null;
       let agUiCore = null;
+      let originalWsHandler = null;
+
+      function restoreOriginalHandler() {
+        if (originalWsHandler && ws) {
+          console.log('♻️ Restoring original WebSocket handler');
+          ws.onmessage = originalWsHandler;
+          currentAgentExecution = null;
+        }
+      }
 
       async function initializeAgUi() {
         try {
+          // Restore original handler when going back to agent list
+          restoreOriginalHandler();
+          
           agUiContainer.innerHTML = '<div style="color: #8be9fd; padding: 20px; text-align: center;">Loading agents...</div>';
           
           // Import @ag-ui/core protocol for event schemas
@@ -1310,8 +1404,11 @@
           // Display agent list
           agUiContainer.innerHTML = `
             <div style="color: #e2e8f0;">
-              <div style="margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid rgba(148,163,184,0.15);">
-                <p style="color: #94a3b8; font-size: 13px;">Select an agent to execute and monitor with AG-UI protocol</p>
+              <div style="margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid rgba(148,163,184,0.15); display: flex; justify-content: space-between; align-items: center;">
+                <p style="color: #94a3b8; font-size: 13px; margin: 0;">Select an agent to execute and monitor with AG-UI protocol</p>
+                <button onclick="initializeAgUi()" style="background: rgba(148,163,184,0.2); color: #cbd5e1; border: 1px solid rgba(148,163,184,0.3); padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; display: flex; align-items: center; gap: 6px;">
+                  🔄 Refresh
+                </button>
               </div>
               <div id="agent-list" style="display: grid; gap: 12px;">
                 ${agents.map(agent => `
@@ -1406,12 +1503,23 @@
           const command = `deno run --allow-read --allow-write --allow-env --allow-net --allow-sys agents/${agentName}/index.ts`;
           
           if (ws && ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({ type: 'run_command', command }));
-            
-            // Set up output capture
+            // Set up output capture BEFORE sending command
             setupAgentOutputCapture(agentName);
             
+            // Send command
+            ws.send(JSON.stringify({ type: 'run_command', command }));
+            
             console.log('▶ Executing agent:', agentName);
+            console.log('   Command:', command);
+            
+            // Update status to running
+            setTimeout(() => {
+              const statusEl = document.getElementById('agent-status');
+              if (statusEl && statusEl.textContent === 'Starting...') {
+                statusEl.textContent = 'Running...';
+                statusEl.style.color = '#8be9fd';
+              }
+            }, 500);
           } else {
             throw new Error('WebSocket not connected');
           }
@@ -1430,29 +1538,58 @@
       }
 
       function setupAgentOutputCapture(agentName) {
-        // Store original onmessage handler
-        const originalHandler = ws.onmessage;
+        console.log('🎬 Setting up output capture for agent:', agentName);
+        
+        // Store original onmessage handler globally so we can restore it
+        if (!originalWsHandler) {
+          originalWsHandler = ws.onmessage;
+        }
         
         // Create enhanced handler for agent output
         ws.onmessage = (event) => {
           try {
             const data = JSON.parse(event.data);
+            console.log('📨 AG-UI received message:', data.type, data);
             
-            // Capture agent output
+            // Check if we're still in AG-UI mode
+            const isAgUiActive = document.getElementById('agent-output') !== null;
+            
+            if (!isAgUiActive) {
+              // AG-UI modal closed, restore original handler
+              console.log('🔄 AG-UI closed, restoring original handler');
+              if (originalWsHandler) {
+                originalWsHandler.call(ws, event);
+              }
+              return;
+            }
+            
+            // Capture agent output (don't pass to terminal)
             if (data.type === 'output') {
               const outputEl = document.getElementById('agent-output');
               if (outputEl) {
+                // Clear "Executing agent..." message on first output
+                if (outputEl.textContent.includes('Executing agent...')) {
+                  outputEl.innerHTML = '';
+                }
+                
                 const line = document.createElement('div');
                 line.textContent = data.data;
                 line.style.whiteSpace = 'pre-wrap';
                 line.style.marginBottom = '2px';
+                line.style.color = '#cbd5e1';
                 outputEl.appendChild(line);
                 outputEl.scrollTop = outputEl.scrollHeight;
+                console.log('✍️ Output written to AG-UI');
+              } else {
+                console.warn('⚠️ agent-output element not found');
               }
+              // Don't call original handler for output - keep it in AG-UI only
+              return;
             }
             
             // Update status on process exit
             if (data.type === 'process_exit') {
+              console.log('🏁 Agent process exited with code:', data.code);
               const statusEl = document.getElementById('agent-status');
               if (statusEl) {
                 if (data.code === 0) {
@@ -1463,11 +1600,32 @@
                   statusEl.style.color = '#ff5555';
                 }
               }
+              
+              // Refresh file explorer after agent execution completes
+              console.log('🔄 Refreshing file explorer...');
+              loadFiles(currentRelativePath);
+              
+              // Don't call original handler for process_exit in AG-UI
+              return;
             }
             
-            // Call original handler
-            if (originalHandler) {
-              originalHandler.call(ws, event);
+            // Handle errors
+            if (data.type === 'error') {
+              console.error('❌ Agent error:', data.message);
+              const outputEl = document.getElementById('agent-output');
+              if (outputEl) {
+                const errorLine = document.createElement('div');
+                errorLine.textContent = `Error: ${data.message}`;
+                errorLine.style.color = '#ff5555';
+                errorLine.style.fontWeight = 'bold';
+                outputEl.appendChild(errorLine);
+              }
+              return;
+            }
+            
+            // For other message types (user_count, pong, etc), call original handler
+            if (originalWsHandler && data.type !== 'output' && data.type !== 'process_exit' && data.type !== 'error') {
+              originalWsHandler.call(ws, event);
             }
           } catch (error) {
             console.error('Error processing agent output:', error);

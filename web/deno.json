@@ -27,6 +27,6 @@
     "jsxImportSource": "react",
     "lib": ["ESNext", "DOM", "DOM.Iterable"]
   },
-  "nodeModulesDir": false
+  "nodeModulesDir": "none"
 }
 

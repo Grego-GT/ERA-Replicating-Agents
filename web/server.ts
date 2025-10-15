@@ -3,11 +3,161 @@
  * Serves static files, provides API endpoints, and WebSocket for terminal
  */
 
-import { join, extname, dirname, relative } from "@std/path";
+import { join, extname, dirname, relative, basename } from "@std/path";
 import * as esbuild from "esbuild";
 
 const port = parseInt(Deno.env.get("PORT") || "3000");
 const isProduction = Deno.env.get("DENO_ENV") === "production" || Deno.env.get("FLY_APP_NAME");
+
+// Helper function to create a zip file from a directory
+async function createZipFromDirectory(dirPath: string): Promise<Uint8Array> {
+  const files: { path: string; content: Uint8Array }[] = [];
+  
+  async function collectFiles(currentPath: string, relativePath: string = "") {
+    for await (const entry of Deno.readDir(currentPath)) {
+      const fullPath = join(currentPath, entry.name);
+      const entryRelativePath = relativePath ? join(relativePath, entry.name) : entry.name;
+      
+      if (entry.isDirectory) {
+        await collectFiles(fullPath, entryRelativePath);
+      } else {
+        const content = await Deno.readFile(fullPath);
+        files.push({ path: entryRelativePath, content });
+      }
+    }
+  }
+  
+  await collectFiles(dirPath);
+  
+  // Simple zip implementation (minimal)
+  const zipData = new Uint8Array(1024 * 1024); // 1MB buffer
+  let offset = 0;
+  
+  // Write local file headers and file data
+  for (const file of files) {
+    const fileName = file.path;
+    const fileNameBytes = new TextEncoder().encode(fileName);
+    const fileContent = file.content;
+    
+    // Local file header (30 bytes + filename length)
+    const header = new Uint8Array(30 + fileNameBytes.length);
+    const view = new DataView(header.buffer);
+    
+    // ZIP signature
+    view.setUint32(0, 0x04034b50, true);
+    // Version needed to extract
+    view.setUint16(4, 20, true);
+    // General purpose bit flag
+    view.setUint16(6, 0, true);
+    // Compression method (0 = stored)
+    view.setUint16(8, 0, true);
+    // Last mod file time
+    view.setUint16(10, 0, true);
+    // Last mod file date
+    view.setUint16(12, 0, true);
+    // CRC-32 (we'll calculate this)
+    view.setUint32(14, 0, true);
+    // Compressed size
+    view.setUint32(18, fileContent.length, true);
+    // Uncompressed size
+    view.setUint32(22, fileContent.length, true);
+    // Filename length
+    view.setUint16(26, fileNameBytes.length, true);
+    // Extra field length
+    view.setUint16(28, 0, true);
+    
+    // Copy filename
+    header.set(fileNameBytes, 30);
+    
+    // Copy header to zip data
+    zipData.set(header, offset);
+    offset += header.length;
+    
+    // Copy file content
+    zipData.set(fileContent, offset);
+    offset += fileContent.length;
+  }
+  
+  // Central directory
+  const centralDirStart = offset;
+  for (const file of files) {
+    const fileName = file.path;
+    const fileNameBytes = new TextEncoder().encode(fileName);
+    const fileContent = file.content;
+    
+    const centralHeader = new Uint8Array(46 + fileNameBytes.length);
+    const view = new DataView(centralHeader.buffer);
+    
+    // Central directory signature
+    view.setUint32(0, 0x02014b50, true);
+    // Version made by
+    view.setUint16(4, 20, true);
+    // Version needed to extract
+    view.setUint16(6, 20, true);
+    // General purpose bit flag
+    view.setUint16(8, 0, true);
+    // Compression method
+    view.setUint16(10, 0, true);
+    // Last mod file time
+    view.setUint16(12, 0, true);
+    // Last mod file date
+    view.setUint16(14, 0, true);
+    // CRC-32
+    view.setUint32(16, 0, true);
+    // Compressed size
+    view.setUint32(20, fileContent.length, true);
+    // Uncompressed size
+    view.setUint32(24, fileContent.length, true);
+    // Filename length
+    view.setUint16(28, fileNameBytes.length, true);
+    // Extra field length
+    view.setUint16(30, 0, true);
+    // Comment length
+    view.setUint16(32, 0, true);
+    // Disk number start
+    view.setUint16(34, 0, true);
+    // Internal file attributes
+    view.setUint16(36, 0, true);
+    // External file attributes
+    view.setUint32(38, 0, true);
+    // Relative offset of local header
+    view.setUint32(42, 0, true);
+    
+    // Copy filename
+    centralHeader.set(fileNameBytes, 46);
+    
+    // Copy central header to zip data
+    zipData.set(centralHeader, offset);
+    offset += centralHeader.length;
+  }
+  
+  // End of central directory record
+  const endRecord = new Uint8Array(22);
+  const endView = new DataView(endRecord.buffer);
+  
+  // End of central dir signature
+  endView.setUint32(0, 0x06054b50, true);
+  // Number of this disk
+  endView.setUint16(4, 0, true);
+  // Number of the disk with the start of the central directory
+  endView.setUint16(6, 0, true);
+  // Total number of entries in the central directory on this disk
+  endView.setUint16(8, files.length, true);
+  // Total number of entries in the central directory
+  endView.setUint16(10, files.length, true);
+  // Size of the central directory
+  endView.setUint32(12, offset - centralDirStart, true);
+  // Offset of start of central directory
+  endView.setUint32(16, centralDirStart, true);
+  // ZIP file comment length
+  endView.setUint16(20, 0, true);
+  
+  // Copy end record to zip data
+  zipData.set(endRecord, offset);
+  offset += endRecord.length;
+  
+  return zipData.slice(0, offset);
+}
 
 // Track active WebSocket connections
 const activeConnections = new Set<WebSocket>();
@@ -532,6 +682,59 @@ async function handler(req: Request): Promise<Response> {
         const content = await Deno.readTextFile(resolvedTarget);
         return new Response(JSON.stringify({ content }), {
           headers: { "content-type": "application/json" },
+        });
+      } catch (error) {
+        return new Response(JSON.stringify({ error: error.message }), {
+          status: 500,
+          headers: { "content-type": "application/json" },
+        });
+      }
+    }
+
+    // Download folder API
+    if (pathname === "/api/download-folder") {
+      const searchParams = url.searchParams;
+      const requestedPath = searchParams.get("path");
+      
+      if (!requestedPath) {
+        return new Response(JSON.stringify({ error: "Path required" }), {
+          status: 400,
+          headers: { "content-type": "application/json" },
+        });
+      }
+
+      try {
+        const basePath = join(Deno.cwd(), "..");
+        const targetPath = join(basePath, requestedPath);
+        
+        // Security: ensure path is within base directory
+        const resolvedTarget = await Deno.realPath(targetPath);
+        const resolvedBase = await Deno.realPath(basePath);
+        
+        if (!resolvedTarget.startsWith(resolvedBase)) {
+          return new Response(JSON.stringify({ error: "Access denied" }), {
+            status: 403,
+            headers: { "content-type": "application/json" },
+          });
+        }
+
+        // Check if it's a directory
+        const stat = await Deno.stat(resolvedTarget);
+        if (!stat.isDirectory) {
+          return new Response(JSON.stringify({ error: "Path is not a directory" }), {
+            status: 400,
+            headers: { "content-type": "application/json" },
+          });
+        }
+
+        // Create a zip file of the directory
+        const zipBuffer = await createZipFromDirectory(resolvedTarget);
+        
+        return new Response(zipBuffer, {
+          headers: {
+            "content-type": "application/zip",
+            "content-disposition": `attachment; filename="${basename(resolvedTarget)}.zip"`,
+          },
         });
       } catch (error) {
         return new Response(JSON.stringify({ error: error.message }), {
